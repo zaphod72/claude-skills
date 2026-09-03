@@ -20,7 +20,7 @@ child finishes. Only the orchestrator can advance it.
 
 Coordinators must never spawn review sub-agents themselves — a coordinator that spawns one stalls
 on it the same way any dispatch stalls it, so reviews run in the top-level session via
-`/code-review` and route fixes back down. Two review-and-fix cycles on one PR is the working limit;
+`/mattpocock-skills:code-review` and route fixes back down. Two review-and-fix cycles on one PR is the working limit;
 a third means the change is not converging.
 
 `references/review-placement.md` — read when placing a review pass in the run.
