@@ -10,7 +10,7 @@ instead of the coordinator that spawned it. A coordinator cannot wake itself, so
 spawns stalls it. The design:
 
 - **Reviews run in this session only.** Whichever branch needs reviewing — a story PR, a merged
-  aspect branch, the integration branch — `/code-review` is invoked here, where sub-agents complete
+  aspect branch, the integration branch — `/mattpocock-skills:code-review` is invoked here, where sub-agents complete
   and notify instead of dead-ending a coordinator's turn. Fixes route down to the owning
   coordinator.
 - **Coordinators never spawn reviewers.** Their final report asks for review — what changed,

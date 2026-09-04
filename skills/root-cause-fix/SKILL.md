@@ -1,6 +1,6 @@
 ---
 name: root-cause-fix
-description: "Use before writing any fix for code review findings — including right after /code-review or /code-review --fix produces findings, after a human posts PR review comments, or whenever the same file/area has drawn findings across more than one review round. Reads the plan, the PR description, and the implementation for discrepancies between them, groups every outstanding finding by root cause, and produces a fix plan organized by root cause instead of one fix per finding. Also directly invocable with a planning-doc reference, e.g. `/root-cause-fix 461 @docs/plan.md`."
+description: "Use before writing any fix for code review findings — including right after a code review produces findings, after a human posts PR review comments, or whenever the same file/area has drawn findings across more than one review round. Reads the plan, the PR description, and the implementation for discrepancies between them, groups every outstanding finding by root cause, and produces a fix plan organized by root cause instead of one fix per finding. Also directly invocable with a planning-doc reference, e.g. `/root-cause-fix 461 @docs/plan.md`."
 ---
 
 # Root-cause fix planning
