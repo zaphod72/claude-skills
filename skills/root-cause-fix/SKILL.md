@@ -9,8 +9,9 @@ Findings get fixed one at a time, and the same area keeps drawing new findings e
 
 **Verify before grouping.** A finding whose citation no longer matches the code, or that names a
 file outside this PR's scope, poisons the root-cause grouping — it invents a shared cause out of a
-stale claim. Classify each finding as stale, wrong, or live first: see the
-`claims-and-scope-discipline` skill.
+stale claim. Classify each finding as stale, wrong, or live first: **call
+`claims-and-scope-discipline`** and apply §1 (classify every drift) and §6 (confirm the finding
+belongs to this scope) to every finding before grouping any of them.
 
 ## Steps
 
@@ -51,9 +52,22 @@ For each group, propose one structural change that removes the root cause — a 
 
 Order groups by how many findings/rounds each explains, most first.
 
-### 6. Stop
+### 6. Stop, or hand off within a run
 
-Hand the diagnosis and plan to the user for approval. Implementation is a separate, later pass.
+**Invoked directly by a human:** stop — hand the diagnosis and plan to the user for approval.
+Implementation is a separate, later pass.
+
+**Invoked from a fix-agent brief inside a `plan-rollout` run:** hand the diagnosis and fix plan to
+that same agent, which implements it test-first now — no stop.
+
+Either way, brief implementation test-first via `/tdd` (`plan-rollout` — `references/coding-agent.md`
+for `/tdd` execution, `references/brief-contract.md` for what the brief must carry), except where
+the fix is Terraform or other declarative-infra code, or genuinely has no reachable seam. **Where
+the fix is to a test suite rather than to production code, red-first is unavailable** — the code
+already works, which is why the finding is about the test. Require mutation with a control arm
+instead: mutate, watch the test fail, revert, watch it pass. Say which of the two the group's fix
+gets. If a group's fix plan is too ambiguous, missing, or incomplete for the implementing agent to
+determine the seam, it must stop and ask rather than guess one.
 
 ## Output shape
 

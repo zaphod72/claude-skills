@@ -1,13 +1,28 @@
 ---
 name: plan-docs
-description: "Conventions for a plan doc that is actively being implemented: home it in the repo's plan/ dir, correct it in place as the work falsifies it, keep its runtime-only checks section until validation consumes it, and put findings on Jira tickets. Use when starting or continuing an implementation run driven by a plan doc, or when a skill like /implement-plan or /root-cause-fix hands one over. Not for docs merely being read, cited, or asked about — those stay where they are."
+description: "Conventions for a plan doc that is actively being implemented: home it in the repo's plan/ dir, correct it in place as the work falsifies it, keep its runtime-only checks section until validation consumes it, and put findings on Jira tickets. Use when starting or continuing an implementation run driven by a plan doc, when a skill like /plan-rollout or /root-cause-fix hands one over, or when a review plan lands in plan/ alongside an implementation plan and the two need telling apart. Not for docs merely being read, cited, or asked about — those stay where they are."
 ---
 
 # Plan docs
 
 A plan is a set of assertions made at writing time. Some decay, some were never true, and work reveals both. A plan doc that is never corrected becomes a trap: the next person reads it as current and rebuilds an error someone already paid to find.
 
-This skill covers three things: where the plan lives, how it stays true, and where findings go. It does not cover creating the branch the plan lives on — when a plan has a top-level ticket and needs a root branch cut for it, that's `ticketed-plan-rollout`.
+This skill covers three things: where the plan lives, how it stays true, and where findings go. It does not cover creating the branch the plan lives on — when a plan has a top-level ticket and needs a root branch cut for it, that's `plan-rollout`. Nor does it cover writing the plan in the first place; that's `plan-and-review`.
+
+## 0. Two species of doc live in `plan/`
+
+Everything below describes an **implementation plan**: a statement of work intended, corrected as the work falsifies it.
+
+A **review plan** is the other species. `dual-scoped-review-plans` authors two at a run's close-out — agent-executable instruction sets for a review pass, written for a Claude agent rather than a person. They take §1's homing rules and §4's separate-commit rule, and four conventions below deliberately do **not** carry:
+
+| Convention | Why a review plan is exempt |
+|---|---|
+| §2, correct it in place | The work does not falsify it. It is an instruction set consumed once per pass, and editing it mid-pass changes what the pass was |
+| §3, "the plan doc alone" | The two review plans sit beside the implementation plan on purpose |
+| §4, one writer, the coordinator | Two independently-scoped authors write them, and the coordinator **must not read either** — that isolation is the whole point of two passes |
+| §5, consumed by close-out | It is the input to a pass that runs *after* the plan is done, so it outlives the doc it sits beside |
+
+Tell them apart by what the file instructs: work to perform, or a review to conduct. When a run produces both, `plan-rollout`'s close-out states which paths are which.
 
 ## 1. Home the plan in the repo
 
@@ -42,7 +57,7 @@ Echo the new path back and use it from then on. If other docs link the old path,
 
 ## 3. Where findings go
 
-Findings, open questions, and decisions go on **Jira tickets** — the story's own ticket, or the epic when the finding spans more than one story. The plan directory carries the plan doc alone; nothing lives beside it. Write finding comments in the `bug-report` format (`~/.claude/skills/bug-report/SKILL.md`): current diagnosis first, dated evidence, ruled-out hypotheses compressed.
+Findings, open questions, and decisions go on **Jira tickets** — the story's own ticket, or the epic when the finding spans more than one story. The plan directory carries the plan doc alone; no companion findings file lives beside it (a review plan is the one exception — §0). Write finding comments in the `bug-report` format (`~/.claude/skills/bug-report/SKILL.md`): current diagnosis first, dated evidence, ruled-out hypotheses compressed.
 
 State this placement in briefs as a standing instruction. Agents holding older conventions create companion files beside the plan out of habit unless told where findings belong.
 
@@ -63,7 +78,7 @@ Fold in the questions the work could not settle — an assumption belonging to a
 
 ## 4. Ownership and commits
 
-**One writer.** Whoever coordinates the work owns the plan doc and edits it in the **main** working tree — never inside a worktree. A file written in a worktree lands on that branch, so a continuously updated doc fragments across branches and conflicts at merge. Sub-agents *report* plan errors and findings; the coordinator writes the former into the doc and files the latter on tickets. Name the plan doc in any sub-agent's "what not to touch".
+**One writer** (for an implementation plan; a review plan has its own author and no coordinator reader — §0). Whoever coordinates the work owns the plan doc and edits it in the **main** working tree — never inside a worktree. A file written in a worktree lands on that branch, so a continuously updated doc fragments across branches and conflicts at merge. Sub-agents *report* plan errors and findings; the coordinator writes the former into the doc and files the latter on tickets. Name the plan doc in any sub-agent's "what not to touch".
 
 **If you are in a worktree and there is no coordinator above you**, say so rather than writing the file to the wrong branch. Give the user the entry you would have written and let them choose: land it on the main tree, or accept it on this branch.
 

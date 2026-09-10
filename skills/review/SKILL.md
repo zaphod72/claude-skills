@@ -1,17 +1,23 @@
 ---
 name: review
-description: Run the code-review workflow, then write every finding in the structured finding format — plain-language summary first, numbered code flow, trigger conditions, references table, glossary. Use when the user types /review or asks for a review with readable findings.
+description: Run the code-review workflow, then write every finding in the structured finding format — plain-language summary first, numbered code flow, trigger conditions, references table, glossary. Use when the user types /review, asks for a review with readable findings, or is passed a review-file path to read and append findings to.
 ---
 
 # Review with structured findings
 
-1. Invoke the built-in `code-review` skill via the Skill tool. Pass this skill's
-   arguments through verbatim (target, effort level, `--comment`, `--fix`).
-2. Follow the code-review skill for **process**: scope, passes, verification,
-   verdicts, and any `ReportFindings` call it requires.
+0. If given a review-file path — a per-PR review file, used inside a `plan-rollout`
+   run as the round-memory mechanism — read it before reviewing, so this round sees
+   earlier rounds' findings and their fixes.
+1. Invoke the `mattpocock-skills:code-review` skill via the Skill tool. Pass this
+   skill's arguments through verbatim (target, effort level, `--comment`, `--fix`),
+   plus the finding template below, so that skill formats its own output with it.
+2. Follow the `mattpocock-skills:code-review` skill for **process**: scope, passes,
+   verification, verdicts, and any `ReportFindings` call it requires.
 3. For finding **prose** — in the chat response and in any review document written
    to disk — use the template below. It overrides the review workflow's default
    finding prose. Keep the workflow's heading markers (ID, verdict, pass number).
+4. If given a review-file path, append this round's findings to it, so a later
+   round's reviewer sees them. Report which prior rounds were read, by number.
 
 ## Finding template
 

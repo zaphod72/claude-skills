@@ -1,0 +1,7 @@
+{
+  "rules": {
+    "body.max_lines": "warn",
+    "description.use_when_phrase": "off",
+    "links.local_markdown_resolves": "off"
+  }
+}
