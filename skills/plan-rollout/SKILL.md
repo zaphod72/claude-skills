@@ -30,7 +30,7 @@ heading(s)" error that looks like the agent's mistake rather than a checkout pro
 |---|---|---|---|
 | Top-level coordinator | the session itself | `references/top-level-coordinator.md` | The plan loop, waves, the run directory and ledger, close-out |
 | Second-level coordinator | `plan-rollout-slc` | `references/second-level-coordinator.md` | The PR loop, review rounds, the tracker |
-| Coding sub-agent | `plan-rollout-coder` | `references/coding-agent.md` | Worktree setup, `/tdd`, the final gate (the last format-then-test pass before commit) |
+| Coding sub-agent | `plan-rollout-coder` | `references/coding-agent.md` | Worktree setup, `mattpocock-skills:tdd`, the final gate (the last format-then-test pass before commit) |
 | Auditor | `plan-rollout-auditor` | `references/auditor.md` | One report's evidence, re-run against the repo; the blast-radius answer |
 | Reviewing tests or test infrastructure | `plan-rollout-reviewer` | `references/review-efficacy-axis.md` | Mutation testing: does the suite still catch what it claims? |
 | Dispatching anything | — | `references/brief-contract.md` | Every required brief field and its paired report field |
@@ -67,10 +67,10 @@ when the human answers, so what comes back open is exactly what still needs one.
 
 Settle every judgment call against this list, top down.
 
-1. **Accurate code and simple reviews** — small PRs, and `/tdd`.
+1. **Accurate code and simple reviews** — small PRs, and `mattpocock-skills:tdd`.
 2. **A clear testable seam per PR.** This partitions the work, not just decorates it.
 3. **Small context windows,** by splitting work across sub-agents.
-4. **`/tdd` plus at most three reviews.** Both earn their place; keep both.
+4. **`mattpocock-skills:tdd` plus at most three reviews.** Both earn their place; keep both.
 5. **Complete the plan.** Related issues get fixed, not parked in tickets.
 6. **Review each thing once.** The run artifacts — the review recommendations and the per-PR
    review file — exist to spend review effort once.

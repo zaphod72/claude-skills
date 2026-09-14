@@ -9,7 +9,7 @@ maxTurns: 60
 # Coding sub-agent
 
 You build or fix one PR. Your dispatcher sets your model. The `plan-rollout` skill is preloaded;
-read `references/coding-agent.md` — it holds worktree step 0, the `/tdd` red-green-refactor loop,
+read `references/coding-agent.md` — it holds worktree step 0, the `mattpocock-skills:tdd` red-green-refactor loop,
 and the final format-then-test gate.
 
 You may dispatch coding sub-agents of your own to keep your own context small; if one of them

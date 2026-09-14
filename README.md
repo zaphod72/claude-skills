@@ -19,11 +19,14 @@ ln -s "$(pwd)/output-styles" ~/.claude/output-styles
 ln -s "$(pwd)/agents" ~/.claude/agents
 ```
 
-Some entries under `skills/` are symlinks into `~/.agents/skills` rather than files in
-this repo — `code-review`, `tdd`, `writing-for-agents` and about a dozen more. They are
-gitignored and machine-local: they get replaced on reinstall, so edits to them do not
-survive, and they are not part of the 16 directories counted above. `.gitignore` has the
-current list.
+This repo depends on skills from the `mattpocock-skills` plugin rather than vendoring
+them: install it with `/plugin install mattpocock-skills@claude-plugins-official`. A
+citation of one of its skills always carries the `mattpocock-skills:` prefix — this repo
+cites `mattpocock-skills:tdd`, `mattpocock-skills:writing-for-agents`, and
+`mattpocock-skills:code-review` from it. Citations here were written against the plugin
+pinned at version `1.2.3` (commit `84fdeffd12f2ee307994d1eb6feb48173b6e0502`); if the
+installed plugin has moved past that revision, re-check the cited skills' behaviour before
+trusting the citation.
 
 ## Which skill to reach for
 
@@ -43,7 +46,7 @@ current list.
   |---|---|---|
   | Top-level coordinator | `references/top-level-coordinator.md` | The plan, the base branch, dependency waves, the run directory and ledger, close-out |
   | Second-level coordinator (one per aspect) | `references/second-level-coordinator.md` | Its aspect's PR loop, review rounds, the Jira tracker |
-  | Coding sub-agent | `references/coding-agent.md` | One PR's worktree, `/tdd`, the commits |
+  | Coding sub-agent | `references/coding-agent.md` | One PR's worktree, `mattpocock-skills:tdd`, the commits |
   | Auditor (one per report) | `references/auditor.md` | Re-running a report's evidence against the repo, and the blast-radius answer |
 
   The top-level coordinator is the session you are in; every other role is dispatched
@@ -194,9 +197,9 @@ Two shapes of edge show up, and they mean different things to a reader:
 | improve-memory | — | session-analysis (takes its output as input) |
 | plan-and-review | plan-docs ("Read it now"); plan-rollout (when the work needs no plan, and again when invoked directly) | plan-docs; claims-and-scope-discipline; plan-rollout (`brief-contract.md`) |
 | plan-docs | bug-report (write findings in its format) | plan-rollout, plan-and-review (boundary note: cutting the branch is the first skill's job and writing the plan the second's, not this one's); dual-scoped-review-plans (§0, which of its conventions a review plan is exempt from) |
-| plan-rollout | plan-and-review (when no ratified plan exists, and it returns rather than calling back); root-cause-fix (when a fix round's findings are not all trivial); review (every review round is a dispatch); dual-scoped-review-plans (at close-out, to author the plans but never run the passes); **external:** `/tdd` | plan-docs (owns rewrite-in-place and the runtime-only-checks table); claims-and-scope-discipline (the integration-merge digest at the aspect merge, and the shared-test-infra baseline); git-worktree-topology |
+| plan-rollout | plan-and-review (when no ratified plan exists, and it returns rather than calling back); root-cause-fix (when a fix round's findings are not all trivial); review (every review round is a dispatch); dual-scoped-review-plans (at close-out, to author the plans but never run the passes); **external:** `mattpocock-skills:tdd` | plan-docs (owns rewrite-in-place and the runtime-only-checks table); claims-and-scope-discipline (the integration-merge digest at the aspect merge, and the shared-test-infra baseline); git-worktree-topology |
 | review | **external:** `mattpocock-skills:code-review` | plan-rollout (the per-PR review file it may be handed) |
-| root-cause-fix | claims-and-scope-discipline (the classify-before-grouping step) | plan-rollout (`coding-agent.md` for `/tdd`, `brief-contract.md` for the brief) |
+| root-cause-fix | claims-and-scope-discipline (the classify-before-grouping step) | plan-rollout (`coding-agent.md` for `mattpocock-skills:tdd`, `brief-contract.md` for the brief) |
 | send-results | — | — |
 | session-analysis | — | dream (both compute the same lock path; kept in sync by hand) |
 
@@ -234,9 +237,15 @@ Notes on edges that needed a judgment call rather than a mechanical match:
   delegation and citation — each says "read it now" and also cites it for supporting
   detail. Both columns carry the edge rather than forcing one.
 - **`review` now points at the plugin, not the built-in.** It used to invoke the
-  unprefixed `code-review`, which on this machine is a gitignored symlink to a local copy
+  unprefixed `code-review`, which on this machine was a gitignored symlink to a local copy
   that had drifted from the plugin of the same name. Two versions of one skill under one
-  name was the defect; the symlink is now simply unused.
+  name was the defect, and it wasn't unique to `code-review`: every one of the fifteen
+  symlinked skills under `skills/` had a plugin counterpart with a different body,
+  confirmed by differing line counts between the two copies (`tdd` 16, `code-review` 54,
+  `research` 2, `codebase-design` 26, `diagnosing-bugs` 58, `resolving-merge-conflicts` 2,
+  `writing-for-agents` 50). The fix is repo-wide: the symlinks are gone, and every
+  citation of one of those fifteen names now points at the `mattpocock-skills:`-prefixed
+  plugin skill instead.
 
 ## Advisor
 

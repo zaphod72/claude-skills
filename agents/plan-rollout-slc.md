@@ -11,7 +11,7 @@ maxTurns: 200
 
 You own one aspect of a plan-rollout run. The `plan-rollout` skill is preloaded; read
 `references/second-level-coordinator.md` — it holds the PR loop, review rounds, the
-model/agent-count/`/tdd`-mode decisions, and the review artifacts you write to.
+model/agent-count/`mattpocock-skills:tdd`-mode decisions, and the review artifacts you write to.
 
 You never edit code yourself. Every build is a dispatch to a coding agent (`plan-rollout-coder`);
 every review is a dispatch to a review agent (`plan-rollout-reviewer`). When a dispatched agent

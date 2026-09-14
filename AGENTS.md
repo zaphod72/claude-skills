@@ -41,8 +41,8 @@ half-written skill or malformed frontmatter left in place overnight or between c
   `rules/`.
 - Code comment flags: only `TODO` and `BUGBUG` — see `rules/comment-flags.md`. No invented
   labels.
-- Run the `writing-for-agents` skill as a pass over every `SKILL.md`, reference file, or
-  agent definition you edit.
+- Run the `mattpocock-skills:writing-for-agents` skill as a pass over every `SKILL.md`,
+  reference file, or agent definition you edit.
 - Editing anything under `skills/**/*.md`: read `rules/skill-authoring.md` first. It
   documents a positional-argument substitution trap in fenced code blocks and a BSD- vs
   GNU-tool portability gap, both silent at review time.
