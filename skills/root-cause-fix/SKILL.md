@@ -60,8 +60,9 @@ Implementation is a separate, later pass.
 **Invoked from a fix-agent brief inside a `plan-rollout` run:** hand the diagnosis and fix plan to
 that same agent, which implements it test-first now — no stop.
 
-Either way, brief implementation test-first via `/tdd` (`plan-rollout` — `references/coding-agent.md`
-for `/tdd` execution, `references/brief-contract.md` for what the brief must carry), except where
+Either way, brief implementation test-first via `mattpocock-skills:tdd` (`plan-rollout` —
+`references/coding-agent.md` for `mattpocock-skills:tdd` execution, `references/brief-contract.md`
+for what the brief must carry), except where
 the fix is Terraform or other declarative-infra code, or genuinely has no reachable seam. **Where
 the fix is to a test suite rather than to production code, red-first is unavailable** — the code
 already works, which is why the finding is about the test. Require mutation with a control arm

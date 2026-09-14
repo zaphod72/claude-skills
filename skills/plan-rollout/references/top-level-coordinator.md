@@ -139,7 +139,7 @@ coordinate_plan(plan):
         aspects = partition(plan)      # yields PR units AND operational units, above
         # partition() criteria, in priority order:
         #   1. small PRs                     (goal 1)
-        #   2. a clear testable seam per PR  (goal 2) — the /tdd boundary. A design that
+        #   2. a clear testable seam per PR  (goal 2) — the mattpocock-skills:tdd boundary. A design that
         #      needs `gather`, sleeps, or retries to make a concurrency test pass has the
         #      wrong seam, not a slow test: name the seam now, don't discover it after
         #      dispatch — a coordinator has nobody to ask once the agent is running.
@@ -333,7 +333,7 @@ Because it stays scope-clean, this actor cannot be the one that synthesises the 
 a session that watched the run without dispatching the authors.
 
 **Brief each author that a Claude agent will execute its plan, not a person.** Each plan is an
-agent-facing document per `writing-for-agents`, with completion criteria a reviewer can fail, and it
+agent-facing document per `mattpocock-skills:writing-for-agents`, with completion criteria a reviewer can fail, and it
 carries its own scope statement and exclusion list in the file — the session that eventually runs
 the pass may never see the brief that produced the plan.
 

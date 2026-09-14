@@ -14,10 +14,10 @@ under `~/.claude/plan-rollout-runs/<ticket>/` — the `run_dir` your brief names
 path. `~/.claude/skills/plan-rollout/scripts/rollout-db` is the only write interface to the run's
 data; `--db <path>` is a global flag before the subcommand.
 
-## Model, agent count, and `/tdd` mode per PR
+## Model, agent count, and `mattpocock-skills:tdd` mode per PR
 
 Every coding dispatch carries three decisions this coordinator makes, never the coding agent:
-which model, how many agents, and which `/tdd` mode.
+which model, how many agents, and which `mattpocock-skills:tdd` mode.
 
 **Model.** Sonnet is the default for well-specified work — the brief already carries the decision
 the agent needs. Move up to Opus where accuracy rests on judgment the brief cannot fully carry:
@@ -35,7 +35,7 @@ tell one story — a migration, its test, a hand-copied mirror, the doc describi
 file set and one agent; splitting a single story across agents is how the doc ends up describing a
 design the code never implemented.
 
-**`/tdd` mode.** New code goes red-first; code that already works and is only gaining tests goes
+**`mattpocock-skills:tdd` mode.** New code goes red-first; code that already works and is only gaining tests goes
 mutation-with-control-arm instead. Deciding which mode a PR or slice gets is this coordinator's call
 — the brief carries the decision (`brief-contract.md`), and `references/coding-agent.md` owns how
 each mode actually executes.
@@ -123,7 +123,7 @@ dispatch — so the cap of three holds even though later rounds ask for more.
    git mutation; this actor never runs one with its own hands.
 
 A fix round is one such dispatch — a coding agent addressing one round's findings, under the same
-brief contract as the original build, `/tdd` included.
+brief contract as the original build, `mattpocock-skills:tdd` included.
 
 **The escalation threshold is non-cosmetic, not non-trivial.** Step 4 fires only when a genuine
 non-cosmetic finding survives to the third review — never merely because a fix needed
@@ -241,7 +241,7 @@ Standards and Spec: see `references/review-efficacy-axis.md`.
 
 `brief-contract.md` owns every brief and report field; `brief_for()`, `brief_for_review()`, and
 `brief_for_fix()` all mean that file. This actor's own contribution to a brief is the decisions above
-it does not delegate: which model, how many agents, which `/tdd` mode, and — for a fix brief — which
+it does not delegate: which model, how many agents, which `mattpocock-skills:tdd` mode, and — for a fix brief — which
 findings are excluded as unrelated (the tracker, above). Run `brief-contract.md`'s pre-dispatch gate
 on the result before sending it — no unresolved placeholders, every named unit already in the
 ledger, and no sentence asserting ledger state ahead of this actor actually creating it.
@@ -257,7 +257,7 @@ directly, not when a fix brief hands it to a coding agent.
 checking a review agent's report before sorting its findings into the tracker — and its §11 carries
 the shared-test-infrastructure baseline procedure `is_never_trivial()` relies on.
 
-`/review` owns the finding template every review dispatch produces. `/tdd` owns how a coding agent
+`/review` owns the finding template every review dispatch produces. `mattpocock-skills:tdd` owns how a coding agent
 actually builds, red-first or otherwise.
 
 Waves, partitioning, the base branch, and close-out all belong to
@@ -311,7 +311,7 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
         agents = [dispatch_agent(name  = pr.name + "-build", role = CODING_AGENT,
                                  model = pick_model(pr),
                                  base  = pr_branch, worktree = NEW,
-                                 skill = "/tdd",     # required in the brief — brief-contract.md
+                                 skill = "mattpocock-skills:tdd",     # required in the brief — brief-contract.md
                                  brief = brief_for(pr, run_dir))]
 
         if coordinator_judges_no_collision(pr):
@@ -321,7 +321,7 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
                     dispatch_agent(name  = slice.name + "-build", role = CODING_AGENT,
                                    model = pick_model(slice),
                                    base  = cut_branch(from = pr_branch, name = slice.name),
-                                   worktree = NEW, skill = "/tdd",
+                                   worktree = NEW, skill = "mattpocock-skills:tdd",
                                    brief = brief_for(slice, run_dir)))
 
         deviations = []
@@ -335,7 +335,7 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
             verdict = audit(header)                        # the evidence check — references/auditor.md
             act_on(verdict.discrepancies)
             check_brief_compliance(header.empty_sections, verdict)   # an unfilled contract field —
-                                                           # /tdd and the seam among them
+                                                           # mattpocock-skills:tdd and the seam among them
 
             if header.status == blocked:                   # out-of-scope, or any decision
                 if resolvable_within(aspect):
@@ -382,7 +382,7 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
                 if findings NOT empty:
                     await(dispatch_agent(name = pr.name + "-fix-r" + round,   # fixes are dispatched —
                                    role = CODING_AGENT, model = pick_model(pr),  # this actor never
-                                   skill = "/tdd", base = pr_branch,             # edits code
+                                   skill = "mattpocock-skills:tdd", base = pr_branch,             # edits code
                                    worktree = pr_worktree,
                                    brief = brief_for_fix(findings, review_file)))
                 append_fix_summary(review_file, round)     # the fix-round summary
@@ -412,7 +412,7 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
 
             await(dispatch_agent(name = pr.name + "-fix-r" + round,
                            role = CODING_AGENT, model = pick_model(pr),
-                           skill = "/tdd", base = pr_branch,
+                           skill = "mattpocock-skills:tdd", base = pr_branch,
                            worktree = pr_worktree,
                            brief = brief_for_fix(to_fix, review_file,
                                    excluded  = unrelated,           # excluded — brief-contract.md's fix-agent brief

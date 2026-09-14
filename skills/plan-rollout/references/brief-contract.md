@@ -5,8 +5,8 @@ required section of every dispatch prompt — what a parent puts in a child's pr
 child must send back.
 
 **Pairing is the whole mechanism, and it is why this file exists.** Every downward requirement
-below has an upward field that would expose its omission. A run whose briefs required `/tdd` in
-prose alone got agents that quietly skipped it, because nothing in the report would have revealed
+below has an upward field that would expose its omission. A run whose briefs required
+`mattpocock-skills:tdd` in prose alone got agents that quietly skipped it, because nothing in the report would have revealed
 the skip — an unpaired requirement drifts silently, and a more emphatic sentence fails the same
 way. State the requirement and its paired field together, or don't bother stating it.
 
@@ -73,8 +73,8 @@ name lands in `empty_sections`.
 | `## red_not_on_base` | `yes` \| `no` — does the same failure reproduce on the base ref; plus a `note add --kind red_not_on_base` row | If checks are red, commit anyway and open the PR as a draft |
 | `## tickets` | Bullets, key, one line, and its labels, each also a `ticket add` row | Record tracker changes; every ticket carries exactly one triage label at creation — `ready-for-agent` when it is fully specified (file:line evidence, a stated fix, an acceptance check), otherwise `ready-for-human` — plus the labels `common-facts.md` names |
 | `## traps` | Bullets, each also a `trap add --repo <r> --path <p>` row: what bit you, where, and what it costs the next agent | Report any new trap you hit |
-| `## tdd_mode_and_seam` | The mode — red-first, mutation-with-a-control-arm, or the brief's no-`/tdd` call still holding — and the seam the tests sit at | Which `/tdd` mode this slice gets, and the seam |
-| `## skills_used` | Which skills you used, and which of them helped | Use `/tdd` unless told otherwise; say which skills helped |
+| `## tdd_mode_and_seam` | The mode — red-first, mutation-with-a-control-arm, or the brief's no-`mattpocock-skills:tdd` call still holding — and the seam the tests sit at | Which `mattpocock-skills:tdd` mode this slice gets, and the seam |
+| `## skills_used` | Which skills you used, and which of them helped | Use `mattpocock-skills:tdd` unless told otherwise; say which skills helped |
 | `## verification` | Each verification command, **what it covers** as you read it from the task or script definition, and its result; whether a long suite ran inline or was backgrounded, and its result once it lands | What the verification command actually covers |
 | `## evidence` | Commands with raw output and counts; what you verified versus inferred; the discriminating test's result; every target number reproduced or flagged; your commit SHAs, plural | Show your work |
 | `## runtime_only_concerns` | Per entry: what needs a live run to confirm, and the log line added to catch it, or why none was | Ask what can only be confirmed once the code runs |
@@ -142,7 +142,7 @@ describe writing or sending a brief, rather than restating these four checks.
 
 | Brief says (downward) | Report must carry (upward) |
 |---|---|
-| Use `/tdd` unless told otherwise | Which skills were used → `## skills_used` |
+| Use `mattpocock-skills:tdd` unless told otherwise | Which skills were used → `## skills_used` |
 | Your assigned file scope; stop and report before leaving it | `## blocked_on`, if it fired, naming the files |
 | Your base branch name, already pushed, and the base SHA recorded now, at dispatch | `## branch`, `## head_sha`, `## base_at_dispatch` — resolved against origin, checked against what was recorded at dispatch, not just quoted back |
 | The worktree path you are to work in, created at the base branch named here | `## worktree`: the absolute path, and whether you created it or were handed one |
@@ -157,7 +157,7 @@ describe writing or sending a brief, rather than restating these four checks.
 | **The disagreement rule, wherever this PR makes a value deterministic:** for every value it pins, write a test in which the *other* source would give a different answer | Those tests, one per pinned value → `## evidence`. A fixture where both sources agree proves nothing about which one the code read — that is how a wrong-source bug survives a fully green suite |
 | Ask for **the changes inventory** — a factual, per-item list of every file, symbol, signature, schema, or config key touched, and what changed about it, with no judgment about other PRs | `## changes_inventory`: raw material for blast radius, not an opinion about it |
 | Name the **shared contract surfaces** this unit may move — signatures, schemas, events, status vocabulary, config keys — and who else builds against them | `## shared_contract_changes`, one bullet each, so the header carries the count and a sibling coordinator can be told directly |
-| Which `/tdd` mode this slice gets — red-first, or mutation-with-a-control-arm — and the seam the tests sit at; where neither fits (no reachable seam, pure config, generated output, Terraform and other declarative-infra changes), say so and why. Mechanics for both modes live in `coding-agent.md` | `## tdd_mode_and_seam`: confirmation of the mode and the seam, or confirmation the brief's no-`/tdd` call still held |
+| Which `mattpocock-skills:tdd` mode this slice gets — red-first, or mutation-with-a-control-arm — and the seam the tests sit at; where neither fits (no reachable seam, pure config, generated output, Terraform and other declarative-infra changes), say so and why. Mechanics for both modes live in `coding-agent.md` | `## tdd_mode_and_seam`: confirmation of the mode and the seam, or confirmation the brief's no-`mattpocock-skills:tdd` call still held |
 | Report deviations as deviations, not as narrative | `## deviations` |
 | Report where the plan was simply wrong, separately from what you chose to do differently | `## plan_errors`, distinct from deviations, plus a `note add --kind plan_error` row — ask for it explicitly or you will not get it |
 | Ask: does this change require anything to happen in a particular order at deploy time? | `## deploy_ordering`: the answer, even when it is "no" |

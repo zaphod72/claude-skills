@@ -121,7 +121,7 @@ line, never an excerpt. The script may read what the session may not.
 ## Each plan is an agent's instruction set, not a human's memo
 
 **A Claude agent executes these plans; a human only decides whether to spend the pass.** So an
-author is writing an agent-facing document, and `writing-for-agents` applies to it in full — steps
+author is writing an agent-facing document, and `mattpocock-skills:writing-for-agents` applies to it in full — steps
 in the order the reviewer performs them, reference it consults on demand, positive phrasing, and no
 prose that merely explains the change to a reader.
 

@@ -32,7 +32,7 @@ implement(unit_of_work, pr_branch, worktree):
         assert rev-parse HEAD == origin/pr_branch
 
     for unit IN unit_of_work.units:
-        loop:                                        # /tdd red-green-refactor, one slice at a time
+        loop:                                        # mattpocock-skills:tdd red-green-refactor, one slice at a time
             if out_of_scope(self, files_i_must_touch(unit)):
                 decision = AWAIT_DECISION(files, ["widen my scope", "leave it"])  # out-of-scope escalation
                 apply(decision)
@@ -75,7 +75,7 @@ reading anything, and assert `rev-parse HEAD` equals `origin/<base>`. See `git-w
 
 ## Building test-first
 
-Load the `/tdd` skill for red-green-refactor itself; here is only what a coding sub-agent adds to it.
+Load the `mattpocock-skills:tdd` skill for red-green-refactor itself; here is only what a coding sub-agent adds to it.
 
 Work in **vertical slices** — a slice is one small piece of behavior built and proven end to end,
 rather than a horizontal block (all fixtures first, then all logic across them). Each slice earns
@@ -95,7 +95,7 @@ Your brief names the seam. When the brief and the plan section together still le
 undeterminable, stop and report `status: blocked` with the specific question, rather than guessing
 one — a guessed seam is an unreviewed design decision, not yours to make silently.
 
-`/tdd` is a default, not an absolute. Where it doesn't fit — no reachable seam, pure config,
+`mattpocock-skills:tdd` is a default, not an absolute. Where it doesn't fit — no reachable seam, pure config,
 generated output, Terraform or other declarative-infra changes whose own `plan`/`apply` cycle is
 the verification loop — your brief says so, and says why. Follow that rather than forcing a loop
 that buys nothing.
