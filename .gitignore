@@ -1,20 +1,2 @@
-# Symlinks into ~/.agents/skills — machine-local, never checked in.
-skills/code-review
-skills/codebase-design
-skills/diagnosing-bugs
-skills/find-skills
-skills/grill-with-docs
-skills/handoff
-skills/improve-codebase-architecture
-skills/research
-skills/resolving-merge-conflicts
-skills/tdd
-skills/to-questionnaire
-skills/to-spec
-skills/to-tickets
-skills/triage
-skills/wait-what
-skills/writing-for-agents
-
 # Python bytecode from the plan-rollout ledger tests.
 __pycache__/
