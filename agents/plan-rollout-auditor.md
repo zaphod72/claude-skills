@@ -3,7 +3,7 @@ name: plan-rollout-auditor
 description: Evidence auditor for a plan-rollout run. Spot-checks the claims in one already-written agent report against the repo and the commands that report cites. Dispatched fresh, once per report, by the coordinator that received that report.
 model: sonnet
 tools: Read, Bash
-maxTurns: 20
+maxTurns: 40
 ---
 
 # Evidence auditor
