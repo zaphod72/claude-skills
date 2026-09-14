@@ -246,7 +246,10 @@ Notes on edges that needed a judgment call rather than a mechanical match:
   54, `research` 2, `codebase-design` 26, `diagnosing-bugs` 58,
   `resolving-merge-conflicts` 2, `writing-for-agents` 50). The fix is repo-wide: the
   symlinks are gone, and every citation of one of those fifteen names now points at the
-  `mattpocock-skills:`-prefixed plugin skill instead.
+  `mattpocock-skills:`-prefixed plugin skill instead. Removing them also un-shadowed
+  Claude Code's own built-in `code-review`, so the unprefixed name resolves to that
+  built-in now — a different tool with a different output shape. Reach for the two-axis
+  review by its full name, `mattpocock-skills:code-review`.
 
 ## Advisor
 
