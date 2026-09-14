@@ -9,17 +9,19 @@ how to verify one.
 
 | Dir | What lives there | Owned or vendored |
 |---|---|---|
-| `skills/` | One `SKILL.md` per skill dir, some with a `references/` folder disclosed from it | Mixed — see below |
+| `skills/` | One `SKILL.md` per skill dir, some with a `references/` folder disclosed from it | Owned |
 | `rules/` | Standalone convention docs, always-on unless scoped by `paths:` frontmatter | Owned |
 | `output-styles/` | Chat-reply output styles | Owned |
 | `agents/` | `plan-rollout-{slc,coder,reviewer,auditor}` subagent definitions (frontmatter + prose) | Owned |
 | `.github/workflows/ci.yml` | Runs `skill-check` over the repo on every PR | Owned |
 | `skill-check.config.json` | skill-check rule overrides — read it, don't guess the settings | Owned |
 
-Some `skills/*` entries are gitignored symlinks into `~/.agents/skills` — vendored,
-machine-local, read-only for this repo. `.gitignore` names exactly which ones; check it
-rather than assuming a directory is ours. Never edit a vendored skill; land the rule in a
-skill this repo owns instead.
+Every `skills/*` entry is owned by this repo. Skills this repo depends on but does not
+own — `mattpocock-skills:tdd`, `mattpocock-skills:writing-for-agents`, and others — come
+from the `mattpocock-skills` plugin instead of a vendored directory here; a citation of
+one of those always carries the `mattpocock-skills:` prefix. See `README.md`'s Install
+section for which plugin skills this repo cites and the pinned version they were cited
+against.
 
 ## Install implies live edits
 

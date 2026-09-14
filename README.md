@@ -22,8 +22,9 @@ ln -s "$(pwd)/agents" ~/.claude/agents
 This repo depends on skills from the `mattpocock-skills` plugin rather than vendoring
 them: install it with `/plugin install mattpocock-skills@claude-plugins-official`. A
 citation of one of its skills always carries the `mattpocock-skills:` prefix — this repo
-cites `mattpocock-skills:tdd`, `mattpocock-skills:writing-for-agents`, and
-`mattpocock-skills:code-review` from it. Citations here were written against the plugin
+cites `mattpocock-skills:tdd`, `mattpocock-skills:writing-for-agents`,
+`mattpocock-skills:code-review`, `mattpocock-skills:research`, and
+`mattpocock-skills:grilling` from it. Citations here were written against the plugin
 pinned at version `1.2.3` (commit `84fdeffd12f2ee307994d1eb6feb48173b6e0502`); if the
 installed plugin has moved past that revision, re-check the cited skills' behaviour before
 trusting the citation.
@@ -239,13 +240,13 @@ Notes on edges that needed a judgment call rather than a mechanical match:
 - **`review` now points at the plugin, not the built-in.** It used to invoke the
   unprefixed `code-review`, which on this machine was a gitignored symlink to a local copy
   that had drifted from the plugin of the same name. Two versions of one skill under one
-  name was the defect, and it wasn't unique to `code-review`: every one of the fifteen
-  symlinked skills under `skills/` had a plugin counterpart with a different body,
-  confirmed by differing line counts between the two copies (`tdd` 16, `code-review` 54,
-  `research` 2, `codebase-design` 26, `diagnosing-bugs` 58, `resolving-merge-conflicts` 2,
-  `writing-for-agents` 50). The fix is repo-wide: the symlinks are gone, and every
-  citation of one of those fifteen names now points at the `mattpocock-skills:`-prefixed
-  plugin skill instead.
+  name was the defect, and it wasn't unique to `code-review`: of the fifteen symlinked
+  skills under `skills/`, seven were checked against their plugin counterpart and every
+  one had a different body, confirmed by differing line counts (`tdd` 16, `code-review`
+  54, `research` 2, `codebase-design` 26, `diagnosing-bugs` 58,
+  `resolving-merge-conflicts` 2, `writing-for-agents` 50). The fix is repo-wide: the
+  symlinks are gone, and every citation of one of those fifteen names now points at the
+  `mattpocock-skills:`-prefixed plugin skill instead.
 
 ## Advisor
 
