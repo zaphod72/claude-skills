@@ -89,6 +89,18 @@ both scope sources. It looks like a dispatch and behaves like a leak.
 The same holds when the passes are eventually run: a reviewer executing the docs-scoped plan is a
 fresh agent whose context contains its plan and nothing else.
 
+A pass writes its findings to its own report and nowhere else until synthesis. Not to the PR, not
+to the ticket, not back into its own plan file — any surface a sibling pass can read is a channel
+between them. A plan step that says "post FAIL findings as PR comments" reads as good practice and
+breaks the isolation the second pass depends on: `gh pr view` returns the comments field, so the
+sibling reviewer sees the first pass's findings mid-run without ever going looking. Every posting
+step waits until both passes have reported.
+
+Audit each plan for this before dispatching. The dispatcher may not read the plan's content, so use
+a script that greps each plan for its posting verbs (`gh pr comment`, `addCommentToJiraIssue`, and
+the like) and prints the matching step numbers only. A hit means the plan needs a fix, not that the
+dispatcher needs to read it.
+
 ## The dispatching session stays out of both scopes
 
 **A dispatcher passes paths. It never reads either plan or either pass.** No `Read`, no `cat`,
