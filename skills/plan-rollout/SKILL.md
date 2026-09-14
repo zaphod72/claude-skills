@@ -5,25 +5,63 @@ description: "Delivers a plan or ticket as merged PRs: two coordinator levels an
 
 # Plan rollout
 
-Three actors deliver a plan as merged PRs: a **top-level coordinator** that owns the plan and the
-base branch, one **second-level coordinator** per aspect that owns its PR loop, and **coding
-sub-agents** that write the code. An **aspect** is one independently deliverable slice of the plan.
+Four actors deliver a plan as merged PRs: a **top-level coordinator** that owns the plan and the
+base branch, one **second-level coordinator** per aspect that owns its PR loop, **coding sub-agents**
+that write the code, and an **auditor** that re-runs the evidence behind each report. An **aspect**
+is one independently deliverable slice of the plan.
 
 **Continuation is the invariant.** A finished PR is a loop iteration, not a checkpoint.
 `needs_human()` below is the complete set of reasons to stop; reporting progress is not one.
 
+## Known constraint
+
+Every actor's reference file, `references/auditor.md`, `scripts/rollout-db`, and all four
+`agents/plan-rollout-*.md` definitions are loaded live through `~/.claude/skills` and
+`~/.claude/agents`, symlinks into this repo's working tree. This skill only functions when the
+working tree checked out at those symlink targets holds this content — merged to trunk, or this
+branch checked out directly. Switching branches in that checkout while a plan-rollout run is live
+breaks every running instance: ledger writes and dispatch fail outright, and a mismatched
+`brief-contract.md` can silently reappear and reject an agent's report with a "missing required
+heading(s)" error that looks like the agent's mistake rather than a checkout problem.
+
 ## Read your own file, and only it
 
-| You are | Read | It holds |
-|---|---|---|
-| Top-level coordinator | `references/top-level-coordinator.md` | The plan loop, waves, run artifacts, close-out |
-| Second-level coordinator | `references/second-level-coordinator.md` | The PR loop, review rounds, the tracker |
-| Coding sub-agent | `references/coding-agent.md` | Worktree setup, `/tdd`, the final gate (the last format-then-test pass before commit) |
-| Dispatching anything | `references/brief-contract.md` | Every required brief field and its paired report field |
-| Reviewing tests or test infrastructure | `references/review-efficacy-axis.md` | Mutation testing: does the suite still catch what it claims? |
+| You are | Dispatched as | Read | It holds |
+|---|---|---|---|
+| Top-level coordinator | the session itself | `references/top-level-coordinator.md` | The plan loop, waves, the run directory and ledger, close-out |
+| Second-level coordinator | `plan-rollout-slc` | `references/second-level-coordinator.md` | The PR loop, review rounds, the tracker |
+| Coding sub-agent | `plan-rollout-coder` | `references/coding-agent.md` | Worktree setup, `/tdd`, the final gate (the last format-then-test pass before commit) |
+| Auditor | `plan-rollout-auditor` | `references/auditor.md` | One report's evidence, re-run against the repo; the blast-radius answer |
+| Reviewing tests or test infrastructure | `plan-rollout-reviewer` | `references/review-efficacy-axis.md` | Mutation testing: does the suite still catch what it claims? |
+| Dispatching anything | — | `references/brief-contract.md` | Every required brief field and its paired report field |
 
-Loading another actor's loop wastes the context that keeps this run accurate. Each brief names the
-one file its recipient reads, and the report field "which reference file was read" catches a miss.
+Loading another actor's loop wastes the context that keeps this run accurate. Each agent definition
+preloads the one file its actor reads, so a brief names that file and no other.
+
+## Where a run keeps its state
+
+Two homes, both derived from the ticket, so any actor — including a restarted one — resolves them
+without being told.
+
+- `~/.claude/plan-rollout-runs/<ticket>/` holds this run's prose: briefs, reports, audits, review
+  recommendations, per-PR review files, the changes inventory.
+- `~/.claude/plan-rollout-runs/rollout.db` is the ledger, shared by every run. Fixed-field,
+  multi-writer data lives there — the partition, agents, report headers, notes, traps, tickets,
+  decisions, audits — because `Edit` and `Write` rewrite whole files and concurrent appends clobber
+  each other silently. `~/.claude/skills/plan-rollout/scripts/rollout-db` is the only way in.
+
+**Every report is two tiers.** The dispatched agent writes its full report to
+`<run dir>/reports/<agent>.md` under fixed `##` headings, then runs `rollout-db report <name>`,
+which parses the file, writes the `headers` row, and prints a **routing header** — status, branch,
+SHAs, the counts, `empty_sections` — at most 30 lines. The header is the only thing that returns
+inline, and the parent opens the report file only when a count sends it there. `report` resolves the
+run from that agent's ledger row, so a dispatcher runs `agent upsert` before its child can report.
+`references/brief-contract.md` owns the headings, the fields, and the pairing rule between them.
+
+**A run resumes from the ledger.** `rollout-db state <ticket>` returns the units, the agents, and
+every decision still open, so a coordinator that was compacted or restarted continues its run instead
+of starting a second one. A question is `decision add`ed when it is asked and `decision resolve`d
+when the human answers, so what comes back open is exactly what still needs one.
 
 ## Goals, in priority order
 
@@ -87,8 +125,18 @@ AWAIT_DECISION(reason, options):
         # Fallback if a resume ever fails: re-dispatch fresh with the decision in
         # the brief — same control flow, but the child's worktree state and
         # everything it already read are lost, so it re-derives them.
-        report_upward(status = blocked, blocked_on = reason, options = options)
+        write_report_file(my_report_path)      # `## status: blocked`, and `## blocked_on`
+                                                # naming the decision and the options you see
+        report_upward(`rollout-db report <self> --file <my_report_path>`)
         return resumed_with_decision()
+
+report_upward(header):
+    # The one way a dispatched agent ends its turn, blocked or done. Write the full
+    # report to <run dir>/reports/<name>.md with every fixed `##` heading present, run
+    # `rollout-db report <name> --file <path>`, and return ONLY the routing header it
+    # printed — never the report text, never a summary alongside it.
+    # brief-contract.md owns the headings and the header's fields.
+    return header
 
 cut_branch(from, name):
     git checkout -b name from; git push -u origin name    # pushed at once
@@ -168,10 +216,12 @@ fetch it.
 
 | Merge | Performed by |
 |---|---|
-| Slice → PR branch | Its second-level coordinator |
-| PR → aspect base branch | Its second-level coordinator, once the review cycle converges |
-| Aspect base → base branch | Top-level coordinator |
+| Slice → PR branch | A sub-agent dispatched by its second-level coordinator |
+| PR → aspect base branch | A sub-agent dispatched by its second-level coordinator, once the review cycle converges |
+| Aspect base → base branch | A sub-agent dispatched by the top-level coordinator |
 | Base branch → trunk | **The human.** The top-level coordinator opens this PR and leaves it |
 
-One actor performs each level's merges in sequence, so no ordering queue is needed. A merge conflict
-between two aspect base branches is a `needs_human()` stop.
+A coordinator never performs a git mutation — merge, push, branch create or delete, worktree add or
+remove — with its own hands; every one above is a dispatch. One actor's dispatch performs each
+level's merges in sequence, so no ordering queue is needed. A merge conflict between two aspect base
+branches is a `needs_human()` stop.

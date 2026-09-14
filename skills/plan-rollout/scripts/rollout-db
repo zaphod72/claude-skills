@@ -1,0 +1,969 @@
+#!/usr/bin/env python3
+"""rollout-db: SQLite ledger for plan-rollout runs.
+
+Stdlib-only. See skills/plan-rollout/SKILL.md and
+skills/plan-rollout/references/*.md for the run contract this backs.
+
+Every table carries: run, created_at, written_by.
+
+DB path resolution, in order: --db <path> flag, ROLLOUT_DB_PATH env var,
+default ~/.claude/plan-rollout-runs/rollout.db. Parent dirs are created on
+demand.
+"""
+import argparse
+import datetime
+import fnmatch
+import json
+import os
+import re
+import sqlite3
+import sys
+from pathlib import Path
+
+DEFAULT_DB_PATH = Path.home() / ".claude" / "plan-rollout-runs" / "rollout.db"
+ENV_DB_PATH = "ROLLOUT_DB_PATH"
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS runs (
+    ticket TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    plan_path TEXT,
+    base_branch TEXT,
+    base_sha TEXT,
+    trunk TEXT,
+    status TEXT,
+    current_wave INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS units (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    unit TEXT NOT NULL,
+    aspect TEXT,
+    wave INTEGER,
+    kind TEXT,
+    depends_on TEXT,
+    status TEXT,
+    ticket TEXT,
+    PRIMARY KEY (run, unit)
+);
+
+CREATE TABLE IF NOT EXISTS agents (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    name TEXT NOT NULL,
+    role TEXT,
+    parent TEXT,
+    aspect TEXT,
+    pr INTEGER,
+    branch TEXT,
+    base_sha TEXT,
+    head_sha TEXT,
+    worktree TEXT,
+    status TEXT,
+    blocked_on TEXT,
+    report_path TEXT,
+    brief_path TEXT,
+    PRIMARY KEY (run, name)
+);
+
+CREATE TABLE IF NOT EXISTS headers (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    status TEXT,
+    branch TEXT,
+    head_sha TEXT,
+    base_at_dispatch TEXT,
+    worktree TEXT,
+    report_path TEXT,
+    blocked_on TEXT,
+    shared_contract_changes TEXT,
+    deviations TEXT,
+    plan_errors TEXT,
+    brief_errors TEXT,
+    left_undone TEXT,
+    skipped TEXT,
+    red_not_on_base TEXT,
+    tickets TEXT,
+    traps TEXT,
+    files_written TEXT,
+    empty_sections TEXT,
+    PRIMARY KEY (run, agent)
+);
+
+CREATE TABLE IF NOT EXISTS notes (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    text TEXT
+);
+
+CREATE TABLE IF NOT EXISTS traps (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    repo TEXT,
+    path TEXT,
+    text TEXT
+);
+
+CREATE TABLE IF NOT EXISTS tickets (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    key TEXT NOT NULL,
+    title TEXT,
+    in_epic TEXT,
+    reason TEXT,
+    agent TEXT,
+    labels TEXT
+);
+
+CREATE TABLE IF NOT EXISTS decisions (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    reason TEXT,
+    options TEXT,
+    answer TEXT,
+    decided_by TEXT
+);
+
+CREATE TABLE IF NOT EXISTS audits (
+    run TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    written_by TEXT NOT NULL,
+    agent TEXT NOT NULL,
+    evidence_status TEXT,
+    discrepancies TEXT,
+    blast_radius_sections TEXT,
+    audit_path TEXT
+);
+"""
+
+
+def now_iso():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def resolve_db_path(cli_value):
+    if cli_value:
+        return Path(cli_value).expanduser()
+    env_value = os.environ.get(ENV_DB_PATH)
+    if env_value:
+        return Path(env_value).expanduser()
+    return DEFAULT_DB_PATH
+
+
+def connect(db_path):
+    db_path = Path(db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), timeout=30)
+    conn.execute("PRAGMA busy_timeout = 30000")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.row_factory = sqlite3.Row
+    conn.executescript(SCHEMA)
+    _migrate(conn)
+    conn.commit()
+    return conn
+
+
+def _migrate(conn):
+    """Add columns that a pre-existing DB predates, guarded by table_info."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(tickets)")}
+    if "labels" not in cols:
+        conn.execute("ALTER TABLE tickets ADD COLUMN labels TEXT")
+
+
+class CliError(Exception):
+    """A user-facing error: print str(self) to stderr, exit 1."""
+
+
+def cmd_init(conn, args):
+    ticket = args.ticket
+    created_at = now_iso()
+    conn.execute(
+        """
+        INSERT INTO runs (ticket, created_at, written_by, plan_path, base_branch, base_sha, trunk, status, current_wave)
+        VALUES (:ticket, :created_at, 'coordinator', :plan_path, :base_branch, :base_sha, :trunk, 'active', 0)
+        ON CONFLICT(ticket) DO UPDATE SET
+            plan_path=excluded.plan_path,
+            base_branch=excluded.base_branch,
+            base_sha=excluded.base_sha,
+            trunk=excluded.trunk
+        """,
+        {
+            "ticket": ticket,
+            "created_at": created_at,
+            "plan_path": args.plan,
+            "base_branch": args.base,
+            "base_sha": args.sha,
+            "trunk": args.base,
+        },
+    )
+    conn.commit()
+    row = conn.execute("SELECT * FROM runs WHERE ticket = ?", (ticket,)).fetchone()
+    return dict(row)
+
+
+UNIT_UPSERT_COLUMNS = [
+    ("aspect", "aspect"),
+    ("wave", "wave"),
+    ("kind", "kind"),
+    ("depends_on", "depends_on"),
+    ("status", "status"),
+    ("ticket", "ticket"),
+]
+
+
+def cmd_unit_upsert(conn, args):
+    created_at = now_iso()
+    values = {col: getattr(args, attr) for col, attr in UNIT_UPSERT_COLUMNS}
+    columns = ["run", "created_at", "written_by", "unit"] + [c for c, _ in UNIT_UPSERT_COLUMNS]
+    placeholders = ", ".join(f":{c}" for c in columns)
+    update_clause = ", ".join(
+        f"{c} = COALESCE(excluded.{c}, units.{c})" for c, _ in UNIT_UPSERT_COLUMNS
+    )
+    params = {
+        "run": args.run,
+        "created_at": created_at,
+        "written_by": args.unit,
+        "unit": args.unit,
+    }
+    params.update(values)
+    conn.execute(
+        f"""
+        INSERT INTO units ({", ".join(columns)})
+        VALUES ({placeholders})
+        ON CONFLICT(run, unit) DO UPDATE SET {update_clause}
+        """,
+        params,
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM units WHERE run = ? AND unit = ?", (args.run, args.unit)
+    ).fetchone()
+    return dict(row)
+
+
+AGENT_UPSERT_COLUMNS = [
+    ("role", "role"),
+    ("parent", "parent"),
+    ("aspect", "aspect"),
+    ("pr", "pr"),
+    ("branch", "branch"),
+    ("base_sha", "base_sha"),
+    ("head_sha", "head_sha"),
+    ("worktree", "worktree"),
+    ("status", "status"),
+    ("blocked_on", "blocked_on"),
+    ("report_path", "report_path"),
+    ("brief_path", "brief_path"),
+]
+
+
+def cmd_agent_upsert(conn, args):
+    created_at = now_iso()
+    values = {col: getattr(args, attr) for col, attr in AGENT_UPSERT_COLUMNS}
+    columns = ["run", "created_at", "written_by", "name"] + [c for c, _ in AGENT_UPSERT_COLUMNS]
+    placeholders = ", ".join(f":{c}" for c in columns)
+    update_clause = ", ".join(
+        f"{c} = COALESCE(excluded.{c}, agents.{c})" for c, _ in AGENT_UPSERT_COLUMNS
+    )
+    params = {
+        "run": args.run,
+        "created_at": created_at,
+        "written_by": args.name,
+        "name": args.name,
+    }
+    params.update(values)
+    conn.execute(
+        f"""
+        INSERT INTO agents ({", ".join(columns)})
+        VALUES ({placeholders})
+        ON CONFLICT(run, name) DO UPDATE SET {update_clause}
+        """,
+        params,
+    )
+    conn.commit()
+    row = conn.execute(
+        "SELECT * FROM agents WHERE run = ? AND name = ?", (args.run, args.name)
+    ).fetchone()
+    return dict(row)
+
+
+NOTE_KINDS = {
+    "left_undone",
+    "skipped",
+    "red_not_on_base",
+    "unrelated_ticket",
+    "hook_warning",
+    "brief_error",
+    "plan_error",
+    "incident",
+    "other",
+}
+
+
+def cmd_note_add(conn, args):
+    if args.kind not in NOTE_KINDS:
+        raise CliError(
+            f"invalid --kind '{args.kind}': must be one of {', '.join(sorted(NOTE_KINDS))}"
+        )
+    created_at = now_iso()
+    conn.execute(
+        "INSERT INTO notes (run, created_at, written_by, agent, kind, text) VALUES (?, ?, ?, ?, ?, ?)",
+        (args.run, created_at, args.agent, args.agent, args.kind, args.text),
+    )
+    conn.commit()
+    return {"run": args.run, "agent": args.agent, "kind": args.kind, "text": args.text}
+
+
+def cmd_trap_add(conn, args):
+    created_at = now_iso()
+    conn.execute(
+        "INSERT INTO traps (run, created_at, written_by, agent, repo, path, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (args.run, created_at, args.agent, args.agent, args.repo, args.path, args.text),
+    )
+    conn.commit()
+    return {"run": args.run, "agent": args.agent, "repo": args.repo, "path": args.path, "text": args.text}
+
+
+def cmd_ticket_add(conn, args):
+    created_at = now_iso()
+    conn.execute(
+        "INSERT INTO tickets (run, created_at, written_by, key, title, in_epic, reason, agent, labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (args.run, created_at, args.agent, args.key, args.title, args.in_epic, args.reason, args.agent, args.labels),
+    )
+    conn.commit()
+    return {"run": args.run, "key": args.key, "title": args.title, "in_epic": args.in_epic, "labels": args.labels}
+
+
+def cmd_decision_add(conn, args):
+    created_at = now_iso()
+    answer = args.answer if args.answer is not None else ""
+    conn.execute(
+        "INSERT INTO decisions (run, created_at, written_by, reason, options, answer, decided_by) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (args.run, created_at, args.decided_by, args.reason, args.options, answer, args.decided_by),
+    )
+    conn.commit()
+    return {"run": args.run, "reason": args.reason, "answer": answer, "decided_by": args.decided_by}
+
+
+def cmd_decision_resolve(conn, args):
+    row = conn.execute(
+        """
+        SELECT rowid FROM decisions
+        WHERE run = ? AND reason = ? AND (answer IS NULL OR answer = '')
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        (args.run, args.reason),
+    ).fetchone()
+    if row is None:
+        raise CliError(
+            f"decision resolve: no open decision found for run '{args.run}' with reason '{args.reason}'"
+        )
+    conn.execute(
+        "UPDATE decisions SET answer = ?, decided_by = ?, written_by = ? WHERE rowid = ?",
+        (args.answer, args.decided_by, args.decided_by, row["rowid"]),
+    )
+    conn.commit()
+    return {"run": args.run, "reason": args.reason, "answer": args.answer, "decided_by": args.decided_by}
+
+
+def cmd_audit_add(conn, args):
+    created_at = now_iso()
+    conn.execute(
+        """INSERT INTO audits (run, created_at, written_by, agent, evidence_status, discrepancies, blast_radius_sections, audit_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            args.run,
+            created_at,
+            args.agent,
+            args.agent,
+            args.evidence_status,
+            args.discrepancies,
+            args.blast_radius_sections,
+            args.audit_path,
+        ),
+    )
+    conn.commit()
+    return {
+        "run": args.run,
+        "agent": args.agent,
+        "evidence_status": args.evidence_status,
+        "audit_path": args.audit_path,
+    }
+
+
+REPORT_HEADINGS = [
+    "status",
+    "agent",
+    "branch",
+    "head_sha",
+    "base_at_dispatch",
+    "worktree",
+    "blocked_on",
+    "shared_contract_changes",
+    "changes_inventory",
+    "deviations",
+    "plan_errors",
+    "brief_errors",
+    "left_undone",
+    "skipped",
+    "red_not_on_base",
+    "tickets",
+    "traps",
+    "tdd_mode_and_seam",
+    "skills_used",
+    "verification",
+    "evidence",
+    "runtime_only_concerns",
+    "deploy_ordering",
+    "files_written",
+    "review_notes",
+]
+
+# Sections whose body is a bullet list; count = number of top-level "- " lines.
+BULLET_SECTIONS = [
+    "shared_contract_changes",
+    "deviations",
+    "plan_errors",
+    "brief_errors",
+    "left_undone",
+    "skipped",
+    "tickets",
+    "traps",
+    "files_written",
+]
+
+VALID_STATUSES = {"done", "blocked", "partial"}
+
+HEADING_RE = re.compile(r"^##\s+(\S+)\s*$")
+
+
+def parse_report_sections(text):
+    """Split a report file's text into {heading: raw_body} for every '## heading' found."""
+    sections = {}
+    current = None
+    buf = []
+    for line in text.splitlines():
+        m = HEADING_RE.match(line)
+        if m:
+            if current is not None:
+                sections[current] = "\n".join(buf).strip()
+            current = m.group(1)
+            buf = []
+        else:
+            if current is not None:
+                buf.append(line)
+    if current is not None:
+        sections[current] = "\n".join(buf).strip()
+    return sections
+
+
+def is_empty_section(body):
+    return body.strip() == "" or body.strip().lower() == "none"
+
+
+def bullet_items(body):
+    if is_empty_section(body):
+        return []
+    items = []
+    for line in body.splitlines():
+        if line.startswith("- "):
+            items.append(line[2:].strip())
+    return items
+
+
+def cmd_report(conn, args):
+    path = Path(args.file)
+    text = path.read_text()
+    sections = parse_report_sections(text)
+
+    missing = [h for h in REPORT_HEADINGS if h not in sections]
+    if missing:
+        raise CliError(
+            "report: missing required heading(s): " + ", ".join(f"## {h}" for h in missing)
+        )
+
+    status = sections["status"].strip().lower()
+    if status not in VALID_STATUSES:
+        raise CliError(
+            f"report: ## status must be one of {'|'.join(sorted(VALID_STATUSES))}, got '{sections['status'].strip()}'"
+        )
+
+    red_raw = sections["red_not_on_base"].strip().lower()
+    if red_raw == "none":
+        red_not_on_base = "no"
+    elif red_raw in ("yes", "no"):
+        red_not_on_base = red_raw
+    else:
+        raise CliError(
+            f"report: ## red_not_on_base must be yes, no, or none, got '{sections['red_not_on_base'].strip()}'"
+        )
+
+    empty_sections = [h for h in REPORT_HEADINGS if is_empty_section(sections[h])]
+
+    bullet_lists = {h: bullet_items(sections[h]) for h in BULLET_SECTIONS}
+
+    agent_row = conn.execute(
+        "SELECT * FROM agents WHERE name = ? ORDER BY created_at DESC LIMIT 1", (args.name,)
+    ).fetchone()
+    if agent_row is None:
+        raise CliError(f"report: no agent row found for '{args.name}'; run 'agent upsert' first")
+    run = agent_row["run"]
+
+    created_at = now_iso()
+    conn.execute(
+        """
+        INSERT INTO headers (
+            run, created_at, written_by, agent, status, branch, head_sha, base_at_dispatch,
+            worktree, report_path, blocked_on, shared_contract_changes, deviations, plan_errors,
+            brief_errors, left_undone, skipped, red_not_on_base, tickets, traps, files_written,
+            empty_sections
+        ) VALUES (
+            :run, :created_at, :written_by, :agent, :status, :branch, :head_sha, :base_at_dispatch,
+            :worktree, :report_path, :blocked_on, :shared_contract_changes, :deviations, :plan_errors,
+            :brief_errors, :left_undone, :skipped, :red_not_on_base, :tickets, :traps, :files_written,
+            :empty_sections
+        )
+        ON CONFLICT(run, agent) DO UPDATE SET
+            created_at=excluded.created_at, written_by=excluded.written_by, status=excluded.status,
+            branch=excluded.branch, head_sha=excluded.head_sha, base_at_dispatch=excluded.base_at_dispatch,
+            worktree=excluded.worktree, report_path=excluded.report_path, blocked_on=excluded.blocked_on,
+            shared_contract_changes=excluded.shared_contract_changes, deviations=excluded.deviations,
+            plan_errors=excluded.plan_errors, brief_errors=excluded.brief_errors,
+            left_undone=excluded.left_undone, skipped=excluded.skipped,
+            red_not_on_base=excluded.red_not_on_base, tickets=excluded.tickets, traps=excluded.traps,
+            files_written=excluded.files_written, empty_sections=excluded.empty_sections
+        """,
+        {
+            "run": run,
+            "created_at": created_at,
+            "written_by": args.name,
+            "agent": args.name,
+            "status": status,
+            "branch": sections["branch"].strip(),
+            "head_sha": sections["head_sha"].strip(),
+            "base_at_dispatch": sections["base_at_dispatch"].strip(),
+            "worktree": sections["worktree"].strip(),
+            "report_path": str(path.resolve()),
+            "blocked_on": sections["blocked_on"].strip(),
+            "shared_contract_changes": json.dumps(bullet_lists["shared_contract_changes"]),
+            "deviations": json.dumps(bullet_lists["deviations"]),
+            "plan_errors": json.dumps(bullet_lists["plan_errors"]),
+            "brief_errors": json.dumps(bullet_lists["brief_errors"]),
+            "left_undone": json.dumps(bullet_lists["left_undone"]),
+            "skipped": json.dumps(bullet_lists["skipped"]),
+            "red_not_on_base": red_not_on_base,
+            "tickets": json.dumps(bullet_lists["tickets"]),
+            "traps": json.dumps(bullet_lists["traps"]),
+            "files_written": json.dumps(bullet_lists["files_written"]),
+            "empty_sections": json.dumps(empty_sections),
+        },
+    )
+
+    # Same transaction as the headers row above: an agent's `agents.status` and
+    # `agents.head_sha` must reflect this report the moment it lands, not only after a
+    # parent remembers to run a separate `agent upsert`. Without this, `rollout-db state`
+    # shows every finished child still at its dispatch-time status until a coordinator
+    # catches up by hand — observed drift, not a hypothetical.
+    conn.execute(
+        "UPDATE agents SET status = :status, head_sha = :head_sha, blocked_on = :blocked_on, "
+        "report_path = :report_path WHERE run = :run AND name = :name",
+        {
+            "status": status,
+            "head_sha": sections["head_sha"].strip(),
+            "blocked_on": sections["blocked_on"].strip() if status == "blocked" else None,
+            "report_path": str(path.resolve()),
+            "run": run,
+            "name": args.name,
+        },
+    )
+    conn.commit()
+
+    ledger_counts = {}
+    for table in ("notes", "traps", "tickets"):
+        (n,) = conn.execute(
+            f"SELECT COUNT(*) FROM {table} WHERE run = ? AND agent = ?", (run, args.name)
+        ).fetchone()
+        ledger_counts[table] = n
+
+    ticket_keys = [
+        r["key"]
+        for r in conn.execute(
+            "SELECT key FROM tickets WHERE run = ? AND agent = ? ORDER BY created_at", (run, args.name)
+        ).fetchall()
+    ]
+
+    header_lines = []
+    header_lines.append(f"status: {status}")
+    header_lines.append(
+        f"agent: {args.name}  branch: {sections['branch'].strip()}  "
+        f"head: {sections['head_sha'].strip()}  base_at_dispatch: {sections['base_at_dispatch'].strip()}"
+    )
+    header_lines.append(f"report_file: {path.resolve()}")
+    if status == "blocked":
+        header_lines.append(f"blocked_on: {sections['blocked_on'].strip()}")
+    header_lines.append(
+        f"shared_contract_changes: {len(bullet_lists['shared_contract_changes'])}"
+        + "".join(f"\n  - {item}" for item in bullet_lists["shared_contract_changes"])
+    )
+    header_lines.append(
+        f"deviations: {len(bullet_lists['deviations'])}  "
+        f"plan_errors: {len(bullet_lists['plan_errors'])}  "
+        f"brief_errors: {len(bullet_lists['brief_errors'])}"
+    )
+    header_lines.append(
+        f"left_undone: {len(bullet_lists['left_undone'])}  "
+        f"skipped: {len(bullet_lists['skipped'])}  "
+        f"red_not_on_base: {red_not_on_base}"
+    )
+    header_lines.append(f"tickets: {', '.join(ticket_keys) if ticket_keys else 'none'}")
+    header_lines.append(
+        f"ledger_rows: notes +{ledger_counts['notes']}, traps +{ledger_counts['traps']}, "
+        f"tickets +{ledger_counts['tickets']}   "
+        f"files_written: {', '.join(bullet_lists['files_written']) if bullet_lists['files_written'] else 'none'}"
+    )
+    header_lines.append(f"empty_sections: {json.dumps(empty_sections)}")
+
+    print("\n".join(header_lines))
+    return None
+
+
+def cmd_state(conn, args):
+    ticket = args.ticket
+    run_row = conn.execute("SELECT * FROM runs WHERE ticket = ?", (ticket,)).fetchone()
+    if run_row is None:
+        raise CliError(f"state: no run found for ticket '{ticket}'")
+    agents = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM agents WHERE run = ? ORDER BY name", (ticket,)
+        ).fetchall()
+    ]
+    units = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM units WHERE run = ? ORDER BY wave, unit", (ticket,)
+        ).fetchall()
+    ]
+    open_decisions = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM decisions WHERE run = ? AND (answer IS NULL OR answer = '') ORDER BY created_at",
+            (ticket,),
+        ).fetchall()
+    ]
+    return {
+        "ticket": ticket,
+        "status": run_row["status"],
+        "current_wave": run_row["current_wave"],
+        "agents": agents,
+        "units": units,
+        "open_decisions": open_decisions,
+    }
+
+
+def _md_table(rows, columns):
+    if not rows:
+        return "_none_\n"
+    lines = ["| " + " | ".join(columns) + " |", "| " + " | ".join("---" for _ in columns) + " |"]
+    for row in rows:
+        lines.append("| " + " | ".join(str(row.get(c, "")) for c in columns) + " |")
+    return "\n".join(lines) + "\n"
+
+
+def cmd_dump(conn, args):
+    ticket = args.ticket
+    run_row = conn.execute("SELECT * FROM runs WHERE ticket = ?", (ticket,)).fetchone()
+    if run_row is None:
+        raise CliError(f"dump: no run found for ticket '{ticket}'")
+
+    agents = [dict(r) for r in conn.execute("SELECT * FROM agents WHERE run = ? ORDER BY name", (ticket,)).fetchall()]
+    units = [dict(r) for r in conn.execute("SELECT * FROM units WHERE run = ? ORDER BY wave, unit", (ticket,)).fetchall()]
+    notes = [dict(r) for r in conn.execute("SELECT * FROM notes WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
+    traps = [dict(r) for r in conn.execute("SELECT * FROM traps WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
+    tickets = [dict(r) for r in conn.execute("SELECT * FROM tickets WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
+    decisions = [dict(r) for r in conn.execute("SELECT * FROM decisions WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
+    audits = [dict(r) for r in conn.execute("SELECT * FROM audits WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
+
+    out = []
+    out.append(f"# Run {ticket}\n")
+    out.append(f"status: {run_row['status']}  current_wave: {run_row['current_wave']}  base: {run_row['base_branch']}@{run_row['base_sha']}\n")
+    out.append("## Units\n")
+    out.append(_md_table(units, ["unit", "aspect", "wave", "kind", "status", "ticket"]))
+    out.append("## Agents\n")
+    out.append(_md_table(agents, ["name", "role", "aspect", "branch", "status", "blocked_on"]))
+    out.append("## Notes\n")
+    out.append(_md_table(notes, ["agent", "kind", "text"]))
+    out.append("## Traps\n")
+    out.append(_md_table(traps, ["agent", "repo", "path", "text"]))
+    out.append("## Tickets\n")
+    out.append(_md_table(tickets, ["key", "title", "in_epic", "labels", "reason", "agent"]))
+    out.append("## Decisions\n")
+    out.append(_md_table(decisions, ["reason", "answer", "decided_by"]))
+    out.append("## Audits\n")
+    out.append(_md_table(audits, ["agent", "evidence_status", "discrepancies", "audit_path"]))
+
+    print("\n".join(out))
+    return None
+
+
+def cmd_traps_list(conn, args):
+    rows = [
+        dict(r)
+        for r in conn.execute(
+            "SELECT * FROM traps WHERE repo = ? ORDER BY created_at", (args.repo,)
+        ).fetchall()
+    ]
+    if args.path:
+        rows = [r for r in rows if fnmatch.fnmatch(r["path"], args.path)]
+    return rows
+
+
+def cmd_hook_check(conn, args):
+    agent = args.agent
+    if not agent:
+        # The SubagentStop hook's `agent_type` field is often empty. There is
+        # no dispatch name to look up, so there is nothing to check.
+        return {"status": "ok", "agent": agent, "skipped": "no agents row"}
+
+    header_row = conn.execute(
+        "SELECT * FROM headers WHERE agent = ? ORDER BY created_at DESC LIMIT 1", (agent,)
+    ).fetchone()
+    agent_row = conn.execute(
+        "SELECT * FROM agents WHERE name = ? ORDER BY created_at DESC LIMIT 1", (agent,)
+    ).fetchone()
+
+    audit_row = conn.execute(
+        "SELECT * FROM audits WHERE agent = ? ORDER BY created_at DESC LIMIT 1", (agent,)
+    ).fetchone()
+
+    if agent_row is None and audit_row is None:
+        # Nothing in the ledger was ever dispatched or audited under this
+        # exact name (e.g. the hook passed an `agent_type` like
+        # "plan-rollout-coder" rather than a dispatch name, or the name is
+        # simply unknown). Only a name the ledger actually recognizes -- via
+        # an `agents` row or, for an auditor, an `audits` row -- can be
+        # checked for a missing `headers` row.
+        return {"status": "ok", "agent": agent, "skipped": "no agents row"}
+
+    run = None
+    if agent_row is not None:
+        run = agent_row["run"]
+    if run is None and header_row is not None:
+        run = header_row["run"]
+    if run is None and audit_row is not None:
+        run = audit_row["run"]
+
+    problems = []
+    if header_row is None:
+        # An auditor agent writes an audits row and never runs `report`, so it
+        # has no headers row by design. That is healthy, not a miss.
+        if audit_row is None:
+            problems.append(f"no headers row found for agent '{agent}'")
+    else:
+        report_path = header_row["report_path"]
+        if not report_path or not Path(report_path).exists():
+            problems.append(f"report_path for agent '{agent}' does not exist on disk: {report_path}")
+        if header_row["written_by"] != agent:
+            problems.append(f"written_by mismatch for agent '{agent}': got '{header_row['written_by']}'")
+
+    if not problems:
+        return {"status": "ok", "agent": agent}
+
+    if run is None:
+        fallback = conn.execute("SELECT ticket FROM runs ORDER BY created_at DESC LIMIT 1").fetchone()
+        run = fallback["ticket"] if fallback else "unknown"
+
+    created_at = now_iso()
+    conn.execute(
+        "INSERT INTO notes (run, created_at, written_by, agent, kind, text) VALUES (?, ?, ?, ?, ?, ?)",
+        (run, created_at, "hook-check", agent, "hook_warning", "; ".join(problems)),
+    )
+    conn.commit()
+    return {"status": "warning", "agent": agent, "problems": problems}
+
+
+def cmd_query(conn, args):
+    sql = args.sql.strip()
+    # Reject anything but a single, standalone SELECT statement.
+    stripped = sql.rstrip(";").strip()
+    if ";" in stripped:
+        raise CliError("query: only a single SELECT statement is allowed (no ';'-separated statements)")
+    if not re.match(r"(?is)^select\b", stripped):
+        raise CliError("query: only SELECT statements are allowed")
+    cursor = conn.execute(stripped)
+    rows = [dict(r) for r in cursor.fetchall()]
+    return rows
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(prog="rollout-db")
+    parser.add_argument("--db", default=None, help="Path to the SQLite ledger (overrides ROLLOUT_DB_PATH and the default)")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_init = sub.add_parser("init")
+    p_init.add_argument("ticket")
+    p_init.add_argument("--plan", required=True)
+    p_init.add_argument("--base", required=True)
+    p_init.add_argument("--sha", required=True)
+    p_init.set_defaults(func=cmd_init)
+
+    p_unit = sub.add_parser("unit")
+    unit_sub = p_unit.add_subparsers(dest="unit_command", required=True)
+    p_unit_upsert = unit_sub.add_parser("upsert")
+    p_unit_upsert.add_argument("unit")
+    p_unit_upsert.add_argument("--run", required=True)
+    p_unit_upsert.add_argument("--aspect")
+    p_unit_upsert.add_argument("--wave", type=int)
+    p_unit_upsert.add_argument("--kind", choices=["pr", "operational"])
+    p_unit_upsert.add_argument("--depends-on")
+    p_unit_upsert.add_argument("--status")
+    p_unit_upsert.add_argument("--ticket")
+    p_unit_upsert.set_defaults(func=cmd_unit_upsert)
+
+    p_agent = sub.add_parser("agent")
+    agent_sub = p_agent.add_subparsers(dest="agent_command", required=True)
+    p_agent_upsert = agent_sub.add_parser("upsert")
+    p_agent_upsert.add_argument("name")
+    p_agent_upsert.add_argument("--run", required=True)
+    p_agent_upsert.add_argument("--role")
+    p_agent_upsert.add_argument("--parent")
+    p_agent_upsert.add_argument("--aspect")
+    p_agent_upsert.add_argument("--pr", type=int)
+    p_agent_upsert.add_argument("--branch")
+    p_agent_upsert.add_argument("--base-sha")
+    p_agent_upsert.add_argument("--head-sha")
+    p_agent_upsert.add_argument("--worktree")
+    p_agent_upsert.add_argument("--status")
+    p_agent_upsert.add_argument("--blocked-on")
+    p_agent_upsert.add_argument("--report-path")
+    p_agent_upsert.add_argument("--brief-path")
+    p_agent_upsert.set_defaults(func=cmd_agent_upsert)
+
+    p_note = sub.add_parser("note")
+    note_sub = p_note.add_subparsers(dest="note_command", required=True)
+    p_note_add = note_sub.add_parser("add")
+    p_note_add.add_argument("--run", required=True)
+    p_note_add.add_argument("--agent", required=True)
+    p_note_add.add_argument("--kind", required=True)
+    p_note_add.add_argument("--text", default="")
+    p_note_add.set_defaults(func=cmd_note_add)
+
+    p_trap = sub.add_parser("trap")
+    trap_sub = p_trap.add_subparsers(dest="trap_command", required=True)
+    p_trap_add = trap_sub.add_parser("add")
+    p_trap_add.add_argument("--run", required=True)
+    p_trap_add.add_argument("--agent", required=True)
+    p_trap_add.add_argument("--repo", required=True)
+    p_trap_add.add_argument("--path", required=True)
+    p_trap_add.add_argument("--text", default="")
+    p_trap_add.set_defaults(func=cmd_trap_add)
+
+    p_ticket = sub.add_parser("ticket")
+    ticket_sub = p_ticket.add_subparsers(dest="ticket_command", required=True)
+    p_ticket_add = ticket_sub.add_parser("add")
+    p_ticket_add.add_argument("--run", required=True)
+    p_ticket_add.add_argument("--key", required=True)
+    p_ticket_add.add_argument("--title", default="")
+    p_ticket_add.add_argument("--in-epic", required=True, choices=["yes", "no"])
+    p_ticket_add.add_argument("--reason", default="")
+    p_ticket_add.add_argument("--agent", required=True)
+    p_ticket_add.add_argument("--labels", default="")
+    p_ticket_add.set_defaults(func=cmd_ticket_add)
+
+    p_decision = sub.add_parser("decision")
+    decision_sub = p_decision.add_subparsers(dest="decision_command", required=True)
+    p_decision_add = decision_sub.add_parser("add")
+    p_decision_add.add_argument("--run", required=True)
+    p_decision_add.add_argument("--reason", required=True)
+    p_decision_add.add_argument("--options", default="[]")
+    p_decision_add.add_argument("--answer", default="")
+    p_decision_add.add_argument("--decided-by", required=True)
+    p_decision_add.set_defaults(func=cmd_decision_add)
+    p_decision_resolve = decision_sub.add_parser("resolve")
+    p_decision_resolve.add_argument("--run", required=True)
+    p_decision_resolve.add_argument("--reason", required=True)
+    p_decision_resolve.add_argument("--answer", required=True)
+    p_decision_resolve.add_argument("--decided-by", required=True)
+    p_decision_resolve.set_defaults(func=cmd_decision_resolve)
+
+    p_audit = sub.add_parser("audit")
+    audit_sub = p_audit.add_subparsers(dest="audit_command", required=True)
+    p_audit_add = audit_sub.add_parser("add")
+    p_audit_add.add_argument("--run", required=True)
+    p_audit_add.add_argument("--agent", required=True)
+    p_audit_add.add_argument("--evidence-status", required=True)
+    p_audit_add.add_argument("--discrepancies", default="")
+    p_audit_add.add_argument("--blast-radius-sections", default="[]")
+    p_audit_add.add_argument("--audit-path", required=True)
+    p_audit_add.set_defaults(func=cmd_audit_add)
+
+    p_query = sub.add_parser("query")
+    p_query.add_argument("sql")
+    p_query.set_defaults(func=cmd_query)
+
+    p_report = sub.add_parser("report")
+    p_report.add_argument("name")
+    p_report.add_argument("--file", required=True)
+    p_report.set_defaults(func=cmd_report, prints_own_output=True)
+
+    p_state = sub.add_parser("state")
+    p_state.add_argument("ticket")
+    p_state.set_defaults(func=cmd_state)
+
+    p_dump = sub.add_parser("dump")
+    p_dump.add_argument("ticket")
+    p_dump.set_defaults(func=cmd_dump, prints_own_output=True)
+
+    p_traps = sub.add_parser("traps")
+    p_traps.add_argument("--repo", required=True)
+    p_traps.add_argument("--path")
+    p_traps.set_defaults(func=cmd_traps_list)
+
+    p_hook_check = sub.add_parser("hook-check")
+    p_hook_check.add_argument("agent")
+    p_hook_check.set_defaults(func=cmd_hook_check, is_hook_check=True)
+
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    db_path = resolve_db_path(args.db)
+    conn = connect(db_path)
+    is_hook_check = getattr(args, "is_hook_check", False)
+    try:
+        result = args.func(conn, args)
+    except CliError as exc:
+        if is_hook_check:
+            print(json.dumps({"status": "error", "detail": str(exc)}))
+            return 0
+        print(str(exc), file=sys.stderr)
+        return 1
+    except Exception as exc:  # hook-check must never crash a caller's session
+        if is_hook_check:
+            print(json.dumps({"status": "error", "detail": str(exc)}))
+            return 0
+        raise
+    finally:
+        conn.close()
+    if not getattr(args, "prints_own_output", False):
+        print(json.dumps(result))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

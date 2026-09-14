@@ -53,9 +53,17 @@ implement(unit_of_work, pr_branch, worktree):
         commit(unit, by_explicit_path)                 # incrementally, before reporting.
                                                         # never `git add -A`, never stash
     push(pr_branch)
+    assert rev-parse(f"origin/{pr_branch}") is not None   # read `## head_sha` back from origin
+                                                        # after this push, never from local HEAD —
+                                                        # a SHA that never reached origin merges nothing
 
     # never writes the plan doc — deviations go upward as data
-    return report_upward(self)                         # report_upward(self) means brief-contract.md
+    for item IN my_notes + my_traps + my_tickets:      # ledger rows BEFORE the report — `report`
+        rollout_db(item)                                # counts rows that already exist
+    write_report_file(my_report_path)                  # <run dir>/reports/<name>.md, named in my
+                                                        # brief; all 25 `##` headings present
+    header = rollout_db("report", self.name, file = my_report_path)   # parses, writes the row, prints
+    return report_upward(header)                       # return the printed header, nothing else
 ```
 
 ## Step 0: never inherit a base implicitly
@@ -101,15 +109,33 @@ scope every step to the files you touched, never repo-wide, and select the tests
 diff. Test as often as you like while a slice is still red-green-refactor; this ordering governs
 only the last run before a commit.
 
+Its exit code only says the command returned, not what it covered — `brief-contract.md`'s "Exit
+code is never the check" is what you report against.
+
 ## Committing and reporting
 
 Commit incrementally, by explicit file path, before you report. Never `git add -A`; never
 `git stash` — see `git-worktree-topology` §2b: the stash is repository-wide, and a shared one
 silently swaps another worktree's uncommitted work into yours.
 
-Report anything that turns out to be wrong, including anything your own brief asserted — not only
-the plan. Refusing a wrong instruction beats implementing it.
+You never write the plan doc; that's a coordinator's job. Report your deviations upward as data.
 
-You never write the plan doc; that's a coordinator's job. Report your deviations upward as data —
-`report_upward(self)` carries the fields `brief-contract.md` defines, including which reference
-file you read. Don't re-derive that list here; that file is the one source of truth for it.
+Reporting is four steps, in this order. `brief-contract.md` owns the 25 `##` headings and what each
+one carries; what matters here is the order, because three of the four steps fail quietly out of it:
+
+1. Write your `note add`, `trap add`, and `ticket add` rows with
+   `~/.claude/skills/plan-rollout/scripts/rollout-db`. `report` counts rows that already exist, so a
+   row added after it is invisible to your coordinator. Any ticket you file for a pre-existing or
+   out-of-scope finding gets exactly one triage label at creation — `ready-for-agent` when it is
+   fully specified, otherwise `ready-for-human` — plus the labels `common-facts.md` names; never
+   leave it unlabelled or on `needs-triage`.
+2. Write the full report to the path your brief names,
+   `~/.claude/plan-rollout-runs/<ticket>/reports/<your-name>.md`, every heading present. A missing
+   heading is a parse error that writes no row at all.
+3. Run `rollout-db report <your-name> --file <that path>`.
+4. Return exactly what it printed — the routing header, at most 30 lines. That header is what your
+   coordinator routes on; the report file carries everything else.
+
+Report anything that turns out to be wrong under `## brief_errors`, including anything your own
+brief asserted, and anything the plan got wrong under `## plan_errors`. Refusing a wrong
+instruction beats implementing it.

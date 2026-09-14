@@ -13,7 +13,7 @@ other's. A *scope source* is the set of files an author may derive its plan from
 
 | Plan | Scoped from | Finds |
 |---|---|---|
-| Notes-scoped | What this change already produced — review notes, findings, deviations, run notes | Where we already know we worried |
+| Notes-scoped | What this change already produced — review recommendations, per-PR review files, deviations, and the run's notes from its ledger | Where we already know we worried |
 | Docs-scoped | The repo's own standards and architecture docs, with no memory of the change | Where the code departs from what the repo says it does |
 
 **Agreement between the two passes is signal, and so is divergence.** A defect both find is real. One
@@ -54,7 +54,10 @@ varies: some repos carry `AGENTS.md` plus a family of `AGENTS.<topic>.md` files,
    the testing doc, a schema change from the database doc.
 
 The notes source is whatever the change accumulated. After a `plan-rollout` run that is the run's own
-artifacts: the review recommendations, the per-PR review files, the run notes, and the deviations.
+artifacts, which live under `~/.claude/plan-rollout-runs/<ticket>/`: the review recommendations, the
+per-PR review files, the changes inventories, and the deviations. The run's notes sit beside them in
+the ledger, `~/.claude/plan-rollout-runs/rollout.db`, readable with
+`~/.claude/skills/plan-rollout/scripts/rollout-db dump <ticket>`.
 
 ## The exclusion list covers content, not just paths
 

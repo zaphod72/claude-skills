@@ -2,19 +2,21 @@
 
 Claude Code skills and rules used across Bookend repos. `skills/` holds 16 skill
 directories (a `SKILL.md` each, some with a `references/` folder disclosed from it);
-`rules/` holds four standalone convention docs; `output-styles/` holds chat-reply styles.
+`rules/` holds four standalone convention docs; `output-styles/` holds chat-reply styles;
+`agents/` holds the four `plan-rollout` agent definitions.
 
 ## Install
 
-`~/.claude/skills`, `~/.claude/rules`, and `~/.claude/output-styles` are symlinks
-straight into this repo's `skills/`, `rules/`, and `output-styles/` directories —
-nothing is copied anywhere. Edit a file here and every session on the machine reads
-the change immediately; there is no sync step.
+`~/.claude/skills`, `~/.claude/rules`, `~/.claude/output-styles`, and `~/.claude/agents`
+are symlinks straight into this repo's `skills/`, `rules/`, `output-styles/`, and
+`agents/` directories — nothing is copied anywhere. Edit a file here and every session
+on the machine reads the change immediately; there is no sync step.
 
 ```
 ln -s "$(pwd)/skills" ~/.claude/skills
 ln -s "$(pwd)/rules" ~/.claude/rules
 ln -s "$(pwd)/output-styles" ~/.claude/output-styles
+ln -s "$(pwd)/agents" ~/.claude/agents
 ```
 
 Some entries under `skills/` are symlinks into `~/.agents/skills` rather than files in
@@ -34,14 +36,22 @@ current list.
   build → review → fix → merge loop. Fires when a ticket or plan needs implementing, when
   work needs partitioning, or when any agent is about to be dispatched to edit code.
 
-  It is built from **three actors**, and each reads only its own reference file — a
+  It is built from **four actors**, and each reads only its own reference file — a
   coordinator never loads another actor's loop:
 
   | Actor | Reads | Owns |
   |---|---|---|
-  | Top-level coordinator | `references/top-level-coordinator.md` | The plan, the base branch, dependency waves, run artifacts, close-out |
+  | Top-level coordinator | `references/top-level-coordinator.md` | The plan, the base branch, dependency waves, the run directory and ledger, close-out |
   | Second-level coordinator (one per aspect) | `references/second-level-coordinator.md` | Its aspect's PR loop, review rounds, the Jira tracker |
   | Coding sub-agent | `references/coding-agent.md` | One PR's worktree, `/tdd`, the commits |
+  | Auditor (one per report) | `references/auditor.md` | Re-running a report's evidence against the repo, and the blast-radius answer |
+
+  The top-level coordinator is the session you are in; every other role is dispatched
+  from an agent definition in `agents/` — `plan-rollout-slc`, `plan-rollout-coder`,
+  `plan-rollout-reviewer`, `plan-rollout-auditor` — each preloading the reference file
+  that actor reads. A run keeps its prose in `~/.claude/plan-rollout-runs/<ticket>/`
+  and its fixed-field, multi-writer rows in one SQLite ledger beside it, so a
+  coordinator that is compacted or restarted resumes instead of starting over.
 
   Two more reference files are read by whoever needs them:
   `references/brief-contract.md` (every field a dispatch brief must carry, paired with the

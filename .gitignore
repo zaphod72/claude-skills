@@ -15,3 +15,6 @@ skills/to-tickets
 skills/triage
 skills/wait-what
 skills/writing-for-agents
+
+# Python bytecode from the plan-rollout ledger tests.
+__pycache__/

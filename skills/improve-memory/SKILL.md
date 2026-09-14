@@ -147,7 +147,9 @@ The `[[...]]` links between detail files are index pointers too, and the file se
 about which form they use: a link may name a file's **filename** (underscores) or its frontmatter
 **`name:`** field (usually hyphens, but not always — a file whose own `name:` breaks that
 convention silently breaks every hyphenated link meant for it). Resolve against the union of both,
-and support the `[[label|target]]` piped form:
+and support the `[[label|target]]` piped form. Scan the detail files only — never
+`memory-improvement-overview.md`, whose quoted "Before" blocks would resurface links that were
+already removed:
 
 ```bash
 # Same scoped-scratch convention as §4 — PID under $TMPDIR (or /tmp), no project slug (see
@@ -158,7 +160,10 @@ IM_WL="$SCRATCH_DIR/im-wl-$$.txt"
 IM_KNOWN="$SCRATCH_DIR/im-known-$$.txt"
 
 cd "$MEMDIR"
-grep -oh '\[\[[^]]*\]\]' *.md | sed 's/\[\[//; s/\]\]//' | awk -F'|' '{print $NF}' | sort -u > "$IM_WL"
+# The overview is excluded: its "Before" blocks quote every link it has ever proposed
+# removing, so scanning it reports links that no real memory file still contains.
+grep -oh --exclude='memory-improvement-overview*.md' '\[\[[^]]*\]\]' *.md \
+  | sed 's/\[\[//; s/\]\]//' | awk -F'|' '{print $NF}' | sort -u > "$IM_WL"
 { ls *.md | sed 's/\.md$//'; grep -h '^name:' *.md | sed 's/^name: *//; s/"//g'; } | sort -u > "$IM_KNOWN"
 comm -23 "$IM_WL" "$IM_KNOWN"
 rm -f "$IM_WL" "$IM_KNOWN"

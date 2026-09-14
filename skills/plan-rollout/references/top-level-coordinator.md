@@ -1,41 +1,58 @@
 # Top-level coordinator
 
 Read this file, and only it. It holds `coordinate_plan(plan)` — the one loop this actor runs — plus
-the run artifacts, the operational units, and the human's review surface, all of which the loop
-below refers to by name.
+the run artifacts, the operational units, the resume path, the evidence check, and the human's
+review surface, all of which the loop below refers to by name.
 
 ## What this actor does with its own hands
 
 Docs, tickets, and minor fixes — never implementing a ticket. Implementing one, including any fix
 round on a PR, is a second-level coordinator's job (`second-level-coordinator.md`); dispatch it.
 
-Otherwise: it always has a base branch, cutting one when none was given; it owns the run artifact
-directory and passes its absolute path down in every brief (`brief-contract.md`); it dispatches one
-second-level coordinator per **aspect** — one independently deliverable slice of the plan — even for
-a single-aspect plan; it performs every aspect-base → base merge and opens the closing base → trunk
-PR without merging it; it seeds review recommendations before coding starts; and it writes every
-accepted deviation into the plan doc (`plan-docs` owns rewrite-in-place, never append).
+Otherwise: it always has a base branch, cutting one when none was given; it owns the run directory
+and the ledger and passes both absolute paths down in every brief (`brief-contract.md`); it
+dispatches one second-level coordinator per **aspect** — one independently deliverable slice of the
+plan — even for a single-aspect plan; it performs every aspect-base → base merge and opens the
+closing base → trunk PR without merging it; it seeds review recommendations before coding starts;
+and it corrects the plan doc in place when falsification or repartitioning moves it (`plan-docs`
+owns rewrite-in-place, never append).
 
 ## Run artifacts this actor owns
 
-Four artifacts, two homes. Pass each absolute path down in every brief rather than letting a
-sub-agent resolve "the scratchpad" itself — a dispatched agent's scratchpad directory carries its
-own session UUID, so a resolved-locally path can silently point somewhere else.
+Prose in a per-run directory, fixed fields in one ledger. Both paths derive from the ticket, so any
+actor — including a restarted one — resolves them without being told, and both go down in every
+brief as absolute paths (`brief-contract.md`).
 
-| Artifact | Home | Lifetime |
-|---|---|---|
-| Skill-efficacy log | `~/.claude/skill-efficacy/<ticket>-<date>.md` | Outlives the run — a human reads it afterward. Create the directory; it does not exist yet |
-| Review recommendations | This session's scratchpad | The run |
-| Per-PR review file | This session's scratchpad | The run |
-| **Run notes** | This session's scratchpad | The run; presented in full at close-out |
+```
+~/.claude/plan-rollout-runs/
+  rollout.db                   the ledger: every run's rows, each carrying a `run` column
+  <ticket>/                    this run's prose, outliving the session
+    review-recommendations.md  seeded by this actor before coding starts
+    review-<pr>.md             one per PR
+    inventory-<aspect>.md      the changes inventory a second-level coordinator writes
+    briefs/<agent>.md          every brief
+    reports/<agent>.md         every full report
+    audits/<agent>.md          every auditor verdict
+    ledger.md                  `rollout-db dump <ticket>`, written at close-out for the human
+```
+
+The ledger outlives every run — its `traps` rows brief the next one. So does the skill-efficacy log,
+`~/.claude/skill-efficacy/<ticket>-<date>.md`; create that directory, it does not exist yet.
 
 Review recommendations and the per-PR review file are `second-level-coordinator.md`'s content: this
-actor seeds the first and creates the directory both live in, but what goes in either belongs there.
+actor seeds the first and creates the directory they live in, but what goes in either belongs there.
 
-**Run notes** — things that must reach the user without stopping the run: work an agent skipped, a
-red check that does not reproduce on the base ref, significant-but-unrelated findings that became
-tickets only, and any operational unit waiting on the closing PR. `needs_human()` stops the run now;
-a run note is read at the end. One condition is never both.
+**The ledger is the only home for fixed-field, multi-writer data** — the run, the partition, agents,
+report headers, notes, traps, tickets, decisions, audits — and
+`~/.claude/skills/plan-rollout/scripts/rollout-db` is the only way in (`SKILL.md` carries why).
+
+**Notes** — things that must reach the user without stopping the run: work an agent skipped, a red
+check that does not reproduce on the base ref, significant-but-unrelated findings that became
+tickets only, a brief or plan statement that turned out wrong, a tooling or environment failure, and
+any operational unit waiting on the closing PR. Whoever observes one writes the row (`note add
+--kind left_undone | skipped | red_not_on_base | unrelated_ticket | hook_warning | brief_error |
+plan_error | incident | other`); this actor reads them once, at close-out. `needs_human()` stops the
+run now; a note is read at the end. One condition is never both.
 
 ## Operational units: nodes, not tickets, not PR steps
 
@@ -56,7 +73,7 @@ Every operational unit is one of two kinds, and `partition()` says which:
   than reviewing a decision an agent made.
 - **Trunk-dependent** — needs code already on trunk: a production deploy, a cutover. Nothing reaches
   trunk until the human merges the closing PR, so these cannot run mid-run at all. They go into the
-  closing PR body as an ordered runbook, and into the run notes. A PR unit that depends on one is a
+  closing PR body as an ordered runbook, and into a `notes` row. A PR unit that depends on one is a
   plan defect — `partition()` rejects it and this actor corrects the plan in place rather than
   scheduling the impossible.
 
@@ -64,7 +81,7 @@ Every operational unit is one of two kinds, and `partition()` says which:
 
 Every inner PR is reviewed and merged by agents. The human's surface at close-out is exactly three
 things: the closing base → trunk PR, whose body lists every inner PR with its ticket and round
-count and carries the run notes in full; the per-PR review files, linked or collapsed into that PR
+count and carries the run's notes in full; the per-PR review files, linked or collapsed into that PR
 body; and any escalation PR, left open and explicitly marked not for merging. The inner PRs stay in
 history for anyone who wants the raw diff, but the human's own reading is converged agent review, not
 diff-by-diff.
@@ -78,118 +95,189 @@ agents will implement faithfully, because their brief *is* the plan.
 coordinate_plan(plan):
     # Never implements a ticket. Docs, tickets, minor fixes only — this actor's own scope.
 
-    artifact_dir = this_session_scratchpad_dir()           # absolute — run artifacts, above
-    efficacy_log = "~/.claude/skill-efficacy/<ticket>-<date>.md"   # the skill-efficacy log
-    ensure_jira_tree(plan)                    # epic + stories + tasks (tracker-shape rules are
-                                               # second-level-coordinator.md's); diff the plan
-                                               # against the tickets that exist, and reconcile
-                                               # the plan against itself — the ticket list is
-                                               # not the work list, and a plan's own count table
-                                               # and wave list can drift apart from each other
-    base = given_base_branch(plan) OR cut_branch(from = real_trunk, name = plan.ticket)
+    db       = "~/.claude/skills/plan-rollout/scripts/rollout-db"   # the only way into the ledger
+    run_dir  = "~/.claude/plan-rollout-runs/<ticket>"               # this run's prose; create it
+    efficacy_log = "~/.claude/skill-efficacy/<ticket>-<date>.md"    # the skill-efficacy log
 
-    # Falsify the plan against the live repo BEFORE any dispatch. Every claim left
-    # unchecked is one N agents implement faithfully, because their brief IS the plan.
-    # Delegate the checking to an agent if the claim list is long (goal 3); the
-    # correction is this actor's.
-    for claim IN plan.factual_claims:
-        #   symbols and paths      -> grep them
-        #   asserted numbers       -> re-run the query, count the rows
-        #   "pending" prerequisites-> git log / gh pr view / the live schema, not a status field
-        #   a prescribed rule      -> measure it against real data
-        #   a mechanical acceptance check -> review the CHECK itself, against two things:
-        #       does the pattern actually implement the rule it claims to enforce, and
-        #       does the criterion survive the change it gates, not just today's code.
-        #       A correct pattern enforcing a wrong criterion reports green for three
-        #       waves running — that is worse than no check at all.
-        if falsified(claim):
-            correct_in_place(plan, claim)          # rewrite the section, never append —
+    state = `db state <ticket>`       # exits non-zero on a ticket it has never seen: a fresh run
+    if that call exited 0:            # resume entry, below
+        base    = `db query "SELECT base_branch FROM runs WHERE ticket = '<ticket>'"`
+        aspects = state.units                      # the work list, not just a wave number
+        reconcile_ledger_with_git(state)           # resume entry, below — BEFORE any dispatch
+        resume_wave = lowest unit.wave WHERE unit.status != done
+    else:
+        base = given_base_branch(plan) OR cut_branch(from = real_trunk, name = plan.ticket)
+        `db init <ticket> --plan <plan.path> --base <base> --sha <base_sha>`
+
+        ensure_jira_tree(plan)     # dispatch(model = "sonnet"): epic + stories + tasks
+                                   # (tracker-shape rules are second-level-coordinator.md's). It
+                                   # diffs the plan against the tickets that exist, and reconciles
+                                   # the plan against itself — the ticket list is not the work
+                                   # list, and a plan's own count table and wave list can drift
+                                   # apart from each other. It returns the KEYS; the Jira tool
+                                   # output stays in the sub-agent.
+
+        # Falsify the plan against the live repo BEFORE any dispatch. Every claim left
+        # unchecked is one N agents implement faithfully, because their brief IS the plan.
+        # Delegate the checking to an agent if the claim list is long (goal 3); the
+        # correction is this actor's.
+        for claim IN plan.factual_claims:
+            #   symbols and paths      -> grep them
+            #   asserted numbers       -> re-run the query, count the rows
+            #   "pending" prerequisites-> git log / gh pr view / the live schema, not a status field
+            #   a prescribed rule      -> measure it against real data
+            #   a mechanical acceptance check -> review the CHECK itself, against two things:
+            #       does the pattern actually implement the rule it claims to enforce, and
+            #       does the criterion survive the change it gates, not just today's code.
+            #       A correct pattern enforcing a wrong criterion reports green for three
+            #       waves running — that is worse than no check at all.
+            if falsified(claim):
+                correct_in_place(plan, claim)      # rewrite the section, never append —
                                                     # plan-docs owns this
-            if contradicts_the_plan_premise(claim): AWAIT_DECISION(claim)
+                if contradicts_the_plan_premise(claim): AWAIT_DECISION(claim)
 
-    aspects = partition(plan)          # yields PR units AND operational units, above
-    # partition() criteria, in priority order:
-    #   1. small PRs                     (goal 1)
-    #   2. a clear testable seam per PR  (goal 2) — the /tdd boundary. A design that
-    #      needs `gather`, sleeps, or retries to make a concurrency test pass has the
-    #      wrong seam, not a slow test: name the seam now, don't discover it after
-    #      dispatch — a coordinator has nobody to ask once the agent is running.
-    #   3. AGENTS.md aspect boundaries
-    #   4. no two PRs touching one file — shared files get sequenced, never reassigned:
-    #      the later PR merges the earlier one's branch first and works from the merged
-    #      diff, since the original finding's line numbers are already stale
-    #   5. a deploy, IAM grant, migration or cutover is an OPERATIONAL unit, classified
-    #      branch-runnable or trunk-dependent (above), never folded into a code PR and
-    #      never left out of the graph
-    #   6. a PR unit depending on a trunk-dependent unit is a plan defect: correct the plan
-    #
-    #   A push-only PR — branch and commits already exist — gets no sub-agent: a brief
-    #   that creates the branch would collide with or redo landed work. Handle it inline
-    #   (`git push`, `gh pr create`); it still occupies its wave slot, because a child
-    #   cannot open its PR until this parent reaches the remote.
-    # A single-aspect plan is a one-element list. It still gets a coordinator — this
-    # actor never runs the PR loop itself (goal 3).
-    seed_review_recommendations(artifact_dir, aspects)   # review recommendations —
+        aspects = partition(plan)      # yields PR units AND operational units, above
+        # partition() criteria, in priority order:
+        #   1. small PRs                     (goal 1)
+        #   2. a clear testable seam per PR  (goal 2) — the /tdd boundary. A design that
+        #      needs `gather`, sleeps, or retries to make a concurrency test pass has the
+        #      wrong seam, not a slow test: name the seam now, don't discover it after
+        #      dispatch — a coordinator has nobody to ask once the agent is running.
+        #   3. AGENTS.md aspect boundaries
+        #   4. no two PRs touching one file — shared files get sequenced, never reassigned:
+        #      the later PR merges the earlier one's branch first and works from the merged
+        #      diff, since the original finding's line numbers are already stale
+        #   5. a deploy, IAM grant, migration or cutover is an OPERATIONAL unit, classified
+        #      branch-runnable or trunk-dependent (above), never folded into a code PR and
+        #      never left out of the graph
+        #   6. a PR unit depending on a trunk-dependent unit is a plan defect: correct the plan
+        #
+        #   A push-only PR — branch and commits already exist — gets no sub-agent: a brief
+        #   that creates the branch would collide with or redo landed work. Handle it inline
+        #   (`git push`, `gh pr create`); it still occupies its wave slot, because a child
+        #   cannot open its PR until this parent reaches the remote.
+        # A single-aspect plan is a one-element list. It still gets a coordinator — this
+        # actor never runs the PR loop itself (goal 3).
+
+        for unit IN aspects:
+            `db unit upsert <unit> --run <ticket> --aspect <a> --wave <n>
+                            --kind <pr|operational> --depends-on <json> --status pending
+                            --ticket <key>`        # the partition IS the resume record: write it
+                                                    # the moment partition() returns
+        seed_review_recommendations(run_dir, aspects)   # review recommendations —
                                                           # second-level-coordinator.md
+        resume_wave = the first wave
 
-    for wave IN dependency_waves(aspects):
+    for wave IN dependency_waves(aspects) FROM resume_wave:
 
         # A branch-runnable operational unit blocks its wave — only a human can perform
         # it (branch-runnable, above).
         for unit IN wave WHERE unit.is_operational:
-            AWAIT_DECISION(unit.runbook_step, ["it ran", "skip it"])   # needs_human()
+            `db decision add --run <ticket> --reason <unit.runbook_step>
+                             --options '["it ran","skip it"]' --decided-by user`   # open from
+                                                    # here, so a restart re-asks rather than
+                                                    # assumes
+            answer = AWAIT_DECISION(unit.runbook_step, ["it ran", "skip it"])   # needs_human()
+            `db decision resolve --run <ticket> --reason <unit.runbook_step> --answer <answer>
+                                 --decided-by user`  # closes the row `state` was reporting open
             set_ticket_status(unit.ticket)
+            `db unit upsert <unit> --run <ticket> --status done`
 
         pending = []
         for aspect IN wave WHERE NOT aspect.is_operational:
+            agent = "plan-rollout-slc-<aspect>"    # named at dispatch, so siblings can message it
+            `db agent upsert <agent> --run <ticket> --role slc --aspect <aspect>
+                             --branch <aspect_base> --base-sha <sha> --worktree <path>
+                             --status dispatched --brief-path <run_dir>/briefs/<agent>.md`
+            # upsert BEFORE dispatch: `rollout-db report` resolves the run from this row and
+            # exits 1 on a name it has never seen.
+            # run `brief-contract.md`'s pre-dispatch gate on brief_for()'s output before sending it
             pending.append(
                 dispatch(role  = SECOND_LEVEL_COORDINATOR,
+                         agent = "plan-rollout-slc",   # the definition; it preloads the reference
                          model = "opus",      # explicit — a fork would inherit this
                                               # agent's model instead
                          base  = cut_branch(from = base, name = aspect.name),
-                         brief = brief_for(aspect, artifact_dir, efficacy_log)))  # brief-contract.md
+                         brief = brief_for(aspect, run_dir, db, efficacy_log)))  # brief-contract.md
 
         # Handle each report as it ARRIVES. Do not wait for the wave to drain —
         # an early finisher must not idle behind a slow sibling. Goal 5.
         while pending NOT empty:
-            report = await_next(pending)                   # brief-contract.md
-            check_evidence(report)                         # verified vs. inferred
-            check_brief_compliance(report)                 # was /tdd used? report field is enough
+            header = await_next(pending)        # the ROUTING HEADER only — brief-contract.md.
+                                                 # The report file stays on disk unless a count
+                                                 # sends this actor to it.
+            unit = the aspect this agent was dispatched for   # its `agents` row carries it
+            `db agent upsert <header.agent> --run <ticket> --status <header.status>
+                             --head-sha <header.head_sha> --report-path <header.report_file>`
 
-            if report.status == blocked:
+            # base_at_dispatch is the child's answer against the --base-sha recorded when this
+            # actor upserted it. A mismatch means every SHA in the report is measured from a base
+            # nobody dispatched, so it becomes the claim to re-verify below.
+            if header.base_at_dispatch != agent_row.base_sha:
+                `db note add --run <ticket> --agent <header.agent> --kind other
+                             --text "reported base <x> against dispatched <y>"`
+
+            # files_written names the artifacts that actually landed. Check the ones a later brief
+            # will point an agent at — inventory-<aspect>.md, the review recommendations. A brief
+            # naming a file nobody wrote buys a confident review of nothing.
+            if the next brief's artifacts NOT IN header.files_written:
+                re-dispatch for the missing artifact before briefing anyone against it
+
+            verdict = await(dispatch(role = AUDITOR, agent = "plan-rollout-auditor",
+                                     model = "sonnet", fresh = TRUE,
+                                     brief = [header.report_file, brief_path, plan.path, origin]))
+            reverify_one_claim(verdict)         # one command, this actor's own hands — evidence,
+            act_on(verdict.discrepancies)       # below. A clean verdict needs nothing else.
+            check_brief_compliance(header.empty_sections, verdict)   # an unfilled contract field
+                                                 # is visible without opening the report
+
+            if header.status == blocked:
                 # A child hit a needs_human() condition. Surface it, then resume the child.
-                answer = AWAIT_DECISION(report.blocked_on, report.options)
-                resume(report.agent, answer); pending.append(report.agent)
+                # `blocked_on` carries the decision AND the options it saw.
+                `db decision add --run <ticket> --reason <header.blocked_on>
+                                 --options <options> --decided-by user`
+                answer = AWAIT_DECISION(header.blocked_on, options)
+                `db decision resolve --run <ticket> --reason <header.blocked_on>
+                                     --answer <answer> --decided-by user`
+                resume(header.agent, answer); pending.append(header.agent)
                 continue
 
-            if report.left_undone:           record_run_note(report.left_undone)   # run notes
-            if report.skipped_planned_work:  record_run_note(report.skipped)       # not a stop
-            if report.red_checks_not_on_base: record_run_note(report.red)          # not a stop
-            if report.unrelated_tickets:     record_run_note(report.unrelated_tickets)
-                                              # run notes — significant findings ticketed,
-                                              # not fixed, because they were unrelated
+            # left_undone, skipped, red_not_on_base, unrelated tickets: the header carries the
+            # COUNTS and the `notes` table already carries the text, written by whoever observed
+            # it. `ledger_rows` is the cross-check — a non-zero count beside `notes +0` means the
+            # text never reached the ledger and close-out would report nothing. Read the rows
+            # themselves once, at close-out.
 
-            if report.deviations:
-                write_deviations_into_plan(report.deviations)   # rewrite in place — plan-docs
+            if header.plan_errors:      # the child found the PLAN wrong, not its own work
+                correct_in_place(plan, `## plan_errors` IN header.report_file)   # this actor
+                                         # owns the plan; plan-docs owns rewrite-in-place
+            if header.brief_errors:     # the brief was wrong, so the next one would be too
+                amend brief_for() before this wave dispatches anything else
 
             # Carry the wave forward. Checked on EVERY report, deviations or not: a PR can
             # follow its plan exactly, report nothing, and still move a signature its
-            # children consume. The change inventory catches that; a deviation list cannot.
-            if affects_later_waves(report.deviations, report.changes):
-                repartition_remaining(aspects)                 # the next wave's brief_for() now
-                reconcile_jira_tree(plan)                      # reads the corrected plan
+            # children consume. The changes inventory catches that; a deviation list cannot.
+            if affects_later_waves(verdict.blast_radius, header.shared_contract_changes):
+                repartition_remaining(aspects)              # the next wave's brief_for() now
+                reconcile_jira_tree(plan)                   # dispatch(model = "sonnet"): reads
+                                                             # the corrected plan, returns keys
+                for unit IN aspects WHERE unit moved:
+                    `db unit upsert <unit> --run <ticket> --wave <n> --depends-on <json>`
 
-            record_artifacts(artifact_dir, report)         # review recommendations, above
-            append_skill_efficacy(efficacy_log, report)    # the skill-efficacy log —
-                                                            # outlives the run, not the scratchpad
-
-            merge_into(base, report.aspect_base_branch)    # this actor — merge readiness, below
+            merge_into(base, header.branch)                # dispatched to Sonnet — never this
+                                                             # actor's own hands — merge readiness, below
             if conflict_between_aspect_base_branches:
                 AWAIT_DECISION(conflict)                   # needs_human()
-            cleanup(report.aspect_base_branch)             # clean up after merge — SKILL.md
+            cleanup(header.branch)                         # dispatched to the same sub-agent — SKILL.md
+            `db unit upsert <unit> --run <ticket> --status done`   # keeps resume_wave true,
+                                                                    # which is what resume reads
+            `db agent upsert <header.agent> --run <ticket> --status done`
 
-    # Close out — what the human reviews, and run notes, both above.
+    # Close out — what the human reviews, above. ONE read of the ledger's prose.
     trunk_dependent = [u for u IN aspects WHERE u.is_operational AND u.trunk_dependent]
+    notes   = `db query "SELECT agent, kind, text FROM notes WHERE run = '<ticket>'"`
+    tickets = `db query "SELECT key, title, in_epic, reason FROM tickets WHERE run = '<ticket>'"`
+    `db dump <ticket>` > run_dir + "/ledger.md"    # the human's copy of the whole run
 
     # Author the two review plans for the pass that comes AFTER this run.
     # dual-scoped-review-plans owns the rules. Skipped when the repo carries no
@@ -198,24 +286,24 @@ coordinate_plan(plan):
     if repo_has_standards_docs():
         review_plan_paths = [
             await(dispatch(role = PLAN_AUTHOR, fresh = TRUE,      # NEVER fork — a fork
-                           scope = run_artifacts(artifact_dir),   # inherits BOTH scopes
+                           scope = run_artifacts(run_dir),        # inherits BOTH scopes
                            excluded = [repo_standards_docs, the_sibling_plan])),
             await(dispatch(role = PLAN_AUTHOR, fresh = TRUE,
                            scope = repo_standards_docs,
-                           excluded = [artifact_dir, run_notes, the_sibling_plan]))]
+                           excluded = [run_dir, the_ledger, the_sibling_plan]))]
                            # gets the diff and the ticket. NO run artifact, ever
         # Each returns a PATH under plan/. This actor does NOT read either one:
         # no Read, no cat/grep/sed, no subshell. Staying scope-clean is what
         # disqualifies it from synthesising, and that is deliberate.
 
     # This run never RUNS either pass, and never compares the two.
-    pr_url = open_pr(base, into = real_trunk,
-                     body = inner_prs_with_tickets_and_round_counts
-                          + run_notes
-                          + runbook(trunk_dependent)
-                          + review_plan_paths)     # PATHS, never plan content
-    # NEVER merge_pr here. The human merges base -> trunk.
-    present_to_user(pr_url, run_notes, efficacy_log, review_plan_paths)
+    pr_url = await(dispatch(role = PR_BODY, model = "sonnet", fresh = TRUE,
+                            brief = [base, real_trunk, inner_prs_with_tickets_and_round_counts,
+                                     notes, tickets, runbook(trunk_dependent),
+                                     review_plan_paths]))    # PATHS, never plan content
+             # It assembles the body, calls open_pr(base, into = real_trunk, body = ...), and
+             # returns the URL. Its brief forbids merge_pr: the human merges base -> trunk.
+    present_to_user(pr_url, notes, efficacy_log, review_plan_paths)
     return pr_url
 ```
 
@@ -226,7 +314,7 @@ and each PR already had its review rounds. These plans exist for a fresh pass a 
 whether to spend, once the closing PR is merged.
 
 Two dispatches, and the whole value is that their scope sources are disjoint: one scopes from what
-this run accumulated (the review recommendations, the per-PR review files, the run notes, the
+this run accumulated (the review recommendations, the per-PR review files, the ledger's notes, the
 deviations), the other from the repo's own standards docs with no knowledge of the run at all. The
 second author receives the diff and the ticket and nothing else — handing it a run artifact, or
 answering its question about the run, collapses two passes into one.
@@ -251,7 +339,46 @@ the pass may never see the brief that produced the plan.
 
 `dual-scoped-review-plans` owns the exclusion lists, the read-back each author reports, the no-fork
 rule, and the synthesis rules. It also owns the exit: a repo with no `AGENTS*.md` and no `CLAUDE.md`
-has no second scope source, so this step is skipped and the run says so in the run notes.
+has no second scope source, so this step is skipped and the run says so in a `notes` row.
+
+## Resuming, at `rollout-db state`
+
+Every write lands in the ledger before the next step starts, so a compacted, restarted, or crashed
+coordinator re-enters `coordinate_plan()` at the top and loses nothing: `state <ticket>` returns the
+units, the agents, and every decision still open. Falsification and `partition()` do not re-run — the
+`units` rows are the work list. **The wave to continue from is derived from those rows: the lowest
+`wave` whose units are not all `done`.** Each open decision goes back to the user; `decision resolve`
+closes one as it is answered, so an answered decision never comes back.
+
+**The ledger records what an agent reported; the branch records what it did.** Before dispatching
+anything on resume, cross-check the two for every agent whose status is not `done`:
+
+| Check | A mismatch means |
+|---|---|
+| `agent.head_sha` against `git rev-parse origin/<agent.branch>` | It committed past its last report, or never pushed |
+| `git status` in `agent.worktree` | Uncommitted work no report mentions |
+
+A mismatch is a `note add --kind other` row, and that agent is resumed or re-briefed **from what the
+branch actually holds**. Briefing from the stale row instead redoes landed work, or skips work that
+never landed.
+
+## Evidence, at each report
+
+The routing header carries counts; the report file carries the claims behind them. A **Sonnet
+auditor** checks those claims, one dispatch per report, and `references/auditor.md` is the file it
+reads — this actor never opens it. Inputs: the brief path, the report path, the plan path, and
+`origin`. It resolves SHAs, re-runs counted commands, confirms the discriminating test ran, checks
+the verification command's scope claim, and compares `inventory-<aspect>.md` against the plan
+sections still outstanding. It writes `audits/<agent>.md` and returns at most ten lines:
+
+```
+evidence: clean | <n> discrepancies
+blast_radius: none | sections [...]
+```
+
+Then this actor **re-verifies exactly one claim with its own hands** — one command — and acts only
+on discrepancies. One check catches an auditor that rubber-stamped; a second is this actor re-reading
+the report it just paid not to read.
 
 ## Carrying the wave forward, at `affects_later_waves`
 
@@ -262,27 +389,45 @@ an event name, a status vocabulary.
 **The inventory is the half that matters, and the reason this runs on every report.** A sub-agent
 reports a deviation when it knowingly departed from its plan section. It reports nothing when it
 implemented that section faithfully and the section itself moved a shared signature — from its own
-seat that is not a deviation, it is the job. The change inventory is what surfaces it, which is why
+seat that is not a deviation, it is the job. The changes inventory is what surfaces it, which is why
 `brief-contract.md` demands the inventory rather than trusting a deviation list to carry the case.
+
+The auditor answers that half in one line. Its `blast_radius` is `inventory-<aspect>.md` compared
+against the plan sections still outstanding, so this actor decides from the verdict rather than from
+the inventory file. The header's `shared_contract_changes` count is the cross-check: a non-zero count
+against a `blast_radius: none` verdict is a discrepancy, and the one claim worth re-verifying.
 
 Repartitioning here is cheap and silent; discovering it after the next wave has built on a stale
 contract is neither. When it fires, the next wave's `brief_for()` reads the corrected plan, so a
-descendant never inherits the stale version.
+descendant never inherits the stale version, and `unit upsert` rewrites the moved rows so a resumed
+coordinator reads the new partition rather than the old one.
 
 ## Merge readiness, at `merge_into`
 
 GitHub's `mergeable` field evaluates a PR against its base independently, so two sibling aspect base
-branches can each report green and still conflict with each other — whichever this actor merges
-second breaks. The check that holds is **performing an actual merge in a throwaway worktree** before
-trusting the result; run it before `merge_into` and treat a real conflict there, not a red
-`mergeable`, as the `needs_human()` signal. This is also the moment to build
-`claims-and-scope-discipline` §9's integration-merge digest — as each aspect base branch lands, not
-after all of them have.
+branches can each report green and still conflict with each other — whichever merges second breaks.
+The check that holds is **performing an actual merge in a throwaway worktree**.
+
+**This actor is a coordinator, never an implementer: every repo-mutating step here is a dispatch,
+never this actor's own hands.** `merge_into` is one dispatch to Sonnet, not a call this actor runs
+itself. The sub-agent creates the throwaway worktree, performs the actual merge, builds
+`claims-and-scope-discipline` §9's integration-merge digest for that branch, and — when the merge is
+clean — pushes it and reports a conflict yes/no plus the digest path; the merge output itself never
+enters this context. A real conflict there, not a red `mergeable`, is the `needs_human()` signal.
+The digest is built as each aspect base branch lands, not after all of them have. The same dispatch
+also performs `cleanup(header.branch)` — the branch delete and worktree removal — once the merge has
+landed; this actor never runs a git mutation (merge, push, branch create or delete, worktree add or
+remove) inline.
 
 ## A dispatched second-level coordinator can die mid-run
 
 A dropped connection, a stall, a terminal API error, between one `await_next(pending)` and the next.
-Before relaunching, check what its aspect base branch actually holds — three outcomes:
+A watchdog turn-limit stop is not one of these — it hits routinely on work of this size and is not
+a logical failure; the agent and its worktree are still there, so assess the tree, then resume it
+with `SendMessage` and a specific next step. Re-dispatching fresh is the wrong default for a
+turn-limit stop, since it discards that worktree state; reserve the three outcomes below for an
+agent that is actually gone. Its `agents` row names the branch and the worktree; the branch, not the
+row, says what landed. Check what its aspect base branch actually holds — three outcomes:
 
 - **Clean** — nothing landed since the last merge. Relaunch the same brief.
 - **A coherent partial** — a PR merged into the aspect base, or a helper written but not yet wired
@@ -295,8 +440,9 @@ not converge either. This actor never implements the fix itself — dispatch rem
 
 ## Cross-references this file does not restate
 
-`needs_human()`, `AWAIT_DECISION()`, and `cut_branch()` are defined once, in
-`SKILL.md`; call them by name. Git and worktree mechanics belong to `git-worktree-topology`.
+`needs_human()`, `AWAIT_DECISION()`, and `cut_branch()` are defined once, in `SKILL.md`, which also
+states the run directory, the ledger, and the routing header; call them by name. Git and worktree
+mechanics belong to `git-worktree-topology`, and `references/auditor.md` belongs to the auditor.
 
 **When no ratified plan exists yet, call `plan-and-review`, consume what it returns, and continue
 here.** It gives back the plan path, the ticket key, and the partition. Control comes back to this
