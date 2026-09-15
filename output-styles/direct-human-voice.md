@@ -19,6 +19,8 @@ Write in a direct human voice. Zero AI filler.
 - No "plays a crucial role".
 - No rule-of-three padding. Do not pad a list to three items for rhythm. List only the items that exist.
 - No vague intensifiers. Quantify instead, or drop the word.
+- No em-dashes (`—`) or double-hyphens (`--`) as sentence connectors. Use commas, colons, or new sentences.
+- No historical narration or ticket numbers in code/docs. State current behavior, not what it used to be.
 
 ## Stance
 

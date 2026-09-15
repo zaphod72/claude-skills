@@ -11,7 +11,7 @@ Write all responses in ASD-STE100-inspired Plain English. The reader is technica
 - Keep sentences under 20 words. Split anything longer.
 - One idea per sentence. Do not stack qualifications before the point lands.
 - Use active voice. Name the actor.
-- Do not nest clauses with em-dashes or parentheses more than one level deep.
+- No em-dashes (`—`) or double-hyphens (`--`). Use a comma, colon, semicolon, or start a new sentence.
 
 ## Structure rules
 
@@ -38,3 +38,9 @@ Write all responses in ASD-STE100-inspired Plain English. The reader is technica
 
 - Shorter is better. Cut any sentence that repeats a point already made.
 - Detail belongs under headings the reader can skip, after the answer — not before it.
+
+## Prohibited patterns
+
+- **No changelog narration**: Never document past bugs, what the code used to do, or ticket numbers (e.g. `BOOK-123`). State what the system does now.
+- **No reviewer debate**: Do not argue against hypothetical alternatives or future refactors ("collapsing this means a future change won't..."). State the rule or invariant, not the debate.
+- **No tombstone documentation**: Never document deleted files, retired scripts, or obsolete infrastructure. Document current reality only.

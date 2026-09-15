@@ -73,6 +73,28 @@ These phrases carry no technical content; each is a pure length tax the reader p
 
 If you can't replace the cliché with a specific number or mechanism, the cliché was hiding the absence of one.
 
+### RULE-08: Calibrate Claims to the Evidence (high)
+
+**Source:** Pinker 2014 Ch. 6; Gopen & Swan 1990.
+**Directive:** Match the verb to the evidence: a measured result "shows" or "measures"; an inference from logs "suggests" or "indicates" (pending confirmation). Don't overclaim ("fixes the root cause" for "fixes one reproduction") or underclaim via reflexive hedging ("it might be worth considering" for "we should do X").
+
+- BAD (PR description): `This refactor future-proofs the payment service.`
+  GOOD (PR description): `This refactor separates the payment-provider adapter from the checkout flow, so adding a new provider no longer requires touching checkout code.`
+- BAD (issue report): `Everything is broken; nothing works.`
+  GOOD (issue report): ``/auth/login returns 500 for all requests after the 2026-04-18 deploy. /auth/logout and /auth/refresh unaffected.``
+
+A technical reader scans for unwarranted "fixes" or "best" and discounts the rest of the document once found.
+
+### RULE-12: Break Long Sentences; Vary Length (high)
+
+**Source:** Strunk & White §II.18; Pinker 2014 Ch. 4.
+**Directive:** Split any sentence over 30 words. Vary sentence length across a paragraph — a run of same-length sentences reads as monotone even when each one is fine on its own.
+
+- BAD (design doc, 38 words): `The ingestion pipeline processes incoming records in batches of one thousand items, stores them in the primary document store, and maintains an index on the timestamp field that supports the range queries the dashboard relies on for reporting.`
+  GOOD (design doc, three sentences): `The ingestion pipeline processes incoming records in batches of a thousand. It writes them to the primary document store, which keeps a timestamp index. The dashboard's range queries rely on that index.`
+
+Long sentences with nested clauses tax the reader's parsing budget past the point where the sentence's own logic can carry it.
+
 ### RULE-06: Avoid Avoidable Jargon (medium)
 
 **Source:** Orwell 1946 Rule 5; Pinker 2014 Ch. 2.
@@ -96,20 +118,6 @@ An experienced reader mentally substitutes the shorter word anyway, so the longe
   GOOD (antithesis, heading): `A Retry Storm, Not the Deploy, Caused the Outage` *(keep only if "not the deploy" rules out something the reader would otherwise suspect; otherwise drop the tail entirely.)*
 
 Double negation costs the reader a hold-then-invert step; antithesis for cadence invents a foil that adds rhythm, not information.
-
-### RULE-08: Calibrate Claims to the Evidence (high)
-
-**Source:** Pinker 2014 Ch. 6; Gopen & Swan 1990.
-**Directive:** Match the verb to the evidence: a measured result "shows" or "measures"; an inference from logs "suggests" or "indicates" (pending confirmation). Don't overclaim ("fixes the root cause" for "fixes one reproduction") or underclaim via reflexive hedging ("it might be worth considering" for "we should do X").
-
-- BAD (PR description): `This refactor future-proofs the payment service.`
-  GOOD (PR description): `This refactor separates the payment-provider adapter from the checkout flow, so adding a new provider no longer requires touching checkout code.`
-- BAD (issue report): `Everything is broken; nothing works.`
-  GOOD (issue report): ``/auth/login returns 500 for all requests after the 2026-04-18 deploy. /auth/logout and /auth/refresh unaffected.``
-
-A technical reader scans for unwarranted "fixes" or "best" and discounts the rest of the document once found.
-
-## Sentence Structure
 
 ### RULE-09: Express Coordinate Ideas in Similar Form (medium)
 
@@ -143,84 +151,11 @@ The reader holds the subject in working memory until the verb arrives; a long in
 
 Gopen & Swan show readers expect new information at the sentence's end; front-loading it and tailing off into old material reads as flat and forces a re-read.
 
-### RULE-12: Break Long Sentences; Vary Length (high)
-
-**Source:** Strunk & White §II.18; Pinker 2014 Ch. 4.
-**Directive:** Split any sentence over 30 words. Vary sentence length across a paragraph — a run of same-length sentences reads as monotone even when each one is fine on its own.
-
-- BAD (design doc, 38 words): `The ingestion pipeline processes incoming records in batches of one thousand items, stores them in the primary document store, and maintains an index on the timestamp field that supports the range queries the dashboard relies on for reporting.`
-  GOOD (design doc, three sentences): `The ingestion pipeline processes incoming records in batches of a thousand. It writes them to the primary document store, which keeps a timestamp index. The dashboard's range queries rely on that index.`
-
-Long sentences with nested clauses tax the reader's parsing budget past the point where the sentence's own logic can carry it.
-
 ## Field-Observed Rules
 
-The next ten rules (RULE-A–J) come from observing LLM output across writing projects and code releases, 2022–2026 — not drawn from a cited authority, but treated as binding alongside the 12 canonical rules above.
+The next 13 rules (RULE-A–M) come from observing LLM output across writing projects and code releases, 2022–2026 — not drawn from a cited authority, but treated as binding alongside the 12 canonical rules above. They are organized in descending order of priority (critical → high → medium → low).
 
-### RULE-A: Don't Convert Prose into Bullets Unless It's a Genuine List (medium)
-
-**Directive:** Keep prose in paragraphs when ideas connect by cause, argument, or narrative. Use bullets only for genuinely parallel enumerations (endpoints, config options, checklist steps). Don't force a 3-item "first, second, third" triad where 2 items or a plain sentence fit.
-
-- BAD (design doc): a 4-bullet list where each bullet is a clause of one causal sentence ("Two-tower retrieval" / "Because the query embedding caches" / "And the document index updates nightly" / "Without re-running inference").
-  GOOD (design doc): `We chose two-tower retrieval because the query embedding caches across sessions and the document index updates nightly without re-running inference.`
-
-Bullets read as "organized," so models reach for them by default — but each bullet strips the connective tissue (because, therefore) the argument needs.
-
-### RULE-B: Don't Use Em/En Dashes as Casual Punctuation (medium)
-
-**Directive:** Use a comma for an appositive, a semicolon for linked independent clauses, a colon for an expansion, parentheses for an aside — not an em or en dash. Numeric ranges (`2020-2026`) and paired names are unaffected; those are hyphens, not this rule's target.
-
-- BAD: `The deploy rolled back automatically — because the health check failed — within 90 seconds.`
-  GOOD: `The deploy rolled back automatically because the health check failed, within 90 seconds.`
-
-LLMs produce dashes at several times a skilled human writer's rate, and readers now recognize the cadence as an AI-tell.
-
-### RULE-C: Don't Start Consecutive Sentences with the Same Word (medium)
-
-**Directive:** Vary the opener across consecutive sentences — pronoun subjects ("It", "We", "The") are the most common offenders once a fluent opener gets reused.
-
-- BAD (postmortem): `It started at 14:00 UTC. It lasted 37 minutes. It affected 12% of users.`
-  GOOD (postmortem): `The incident started at 14:00 UTC, lasted 37 minutes, and affected 12% of users.`
-
-Once an opener works, next-token sampling keeps reusing it — the paragraph reads as template-filled even when each sentence is individually correct.
-
-### RULE-D: Don't Overuse Transition Words (medium)
-
-**Directive:** Don't open a sentence with "Additionally"/"Furthermore"/"Moreover"/"In addition"/"Notably" unless the logical move (contrast, concession) genuinely needs flagging — usually the content alone makes the connection.
-
-- BAD (release note): `This release adds OAuth support. Additionally, it fixes the CSV export crash. Furthermore, it improves startup time.`
-  GOOD (release note): `OAuth support lands in this release. The CSV export crash is fixed. Startup time drops from 4.2s to 1.8s.`
-
-These transitions appear at far higher frequency in LLM output than in skilled technical prose, producing a distinctive, recognizable cadence.
-
-### RULE-E: Don't Close Every Paragraph with a Summary Sentence (medium)
-
-**Directive:** Don't end a body paragraph with a sentence restating its own point ("In summary, ...", "Overall, this means ..."). Reserve summary closers for the final paragraph of a piece, or a long section meant to be skimmed. Test: if deleting the closer leaves the point intact, delete it.
-
-- BAD (design doc): `We chose two-tower retrieval because query embeddings cache across sessions. Thus, the architecture is well-suited to our caching strategy.`
-  GOOD (design doc): `We chose two-tower retrieval because query embeddings cache across sessions.`
-
-The closer signals "I am finishing this thought" without adding information; a skimming reader has already moved on.
-
-### RULE-F: Keep Terms Consistent; Don't Redefine Abbreviations Mid-Document (medium)
-
-**Directive:** Once a term or abbreviation is defined, keep using that exact form. Don't alternate synonyms for the same thing ("the gateway" / "the ingress layer" / "the front door"), and don't re-expand an abbreviation already defined earlier.
-
-- BAD (API doc): `The /users endpoint returns user objects. ... later ... The user endpoint supports filtering. ... later ... Our user resource accepts query parameters.`
-  GOOD (API doc): `The /users endpoint returns user objects. ... later ... /users supports filtering. ... later ... /users accepts query parameters.`
-
-Varied terminology masks whether a new term is the same entity or a new one, forcing the reader to check each time.
-
-### RULE-G: Title-Case Section Headings (low)
-
-**Directive:** Capitalize first word, last word, and all major words in headings; lowercase articles, coordinating conjunctions, and short prepositions. Applies to Markdown/RST headings unless the repo's own convention is sentence-case — check existing docs before applying.
-
-- BAD (README): `## Getting started with the API`
-  GOOD (README): `## Getting Started with the API`
-
-LLMs default to sentence-case headings from docs-site training data; in a title-case repo this reads as unedited.
-
-### RULE-H: Support Claims with Citation or Concrete Evidence (critical)
+### RULE-A: Support Claims with Citation or Concrete Evidence (critical)
 
 **Directive:** When a sentence asserts a factual claim that warrants attribution (a vendor's behavior, an RFC requirement, a measured result), name the specific source or give the concrete evidence (a number, a log line, an observed test run) — never a handwavy "it's generally known that" or "this should be faster". Never invent a source: verify it exists (the vendor's own docs, the RFC text, your own test output) before citing it, or mark `[UNVERIFIED]`.
 
@@ -231,16 +166,94 @@ LLMs default to sentence-case headings from docs-site training data; in a title-
 
 An uncited claim is unverifiable; a fabricated source is worse, since it destroys reader trust permanently once caught. Related: RULE-03 fights vague nouns and RULE-08 fights uncalibrated verbs — a single sloppy sentence often trips all three.
 
-### RULE-I: Prefer Full Forms over Contractions in Formal Prose (low)
+### RULE-B: State the Rule, Not Its History (critical)
 
-**Directive:** In formal technical prose (specs, API docs, formal design docs), write "it is" not "it's", "cannot" not "can't". Contractions are fine in informal registers (release notes, commit messages) — pick a register and hold it within one document.
+**Directive:** Never narrate past bugs, what the code used to do, or ticket numbers in code comments or documentation. State what the system does and requires now. History belongs in commit messages, PR descriptions, and issue trackers.
 
-- BAD (API spec): `If the request body can't be parsed, the endpoint won't return a 200 response.`
-  GOOD (API spec): `If the request body cannot be parsed, the endpoint does not return a 200 response.`
+- BAD (code comment): `BOOK-638: previously matched only exact strings, so unnormalized references fell through to None. Normalizes candidates before matching.`
+  GOOD (code comment): `Normalizes candidate references before matching.`
+- BAD (design doc): `This endpoint originally used Redis, but after the outage in Q2 we switched to PostgreSQL advisory locks.`
+  GOOD (design doc): `This endpoint uses PostgreSQL advisory locks for mutual exclusion.`
 
-A contraction inside otherwise-formal prose reads as a register break, even though the meaning parses fine either way.
+Narrating what used to be forces the reader to reconstruct the timeline and decipher whether the described behavior is current or superseded.
 
-### RULE-J: Don't Use Self-Certifying Language (medium)
+### RULE-C: Document the Present, Not the Cemetery (critical)
+
+**Directive:** Never document deleted files, retired scripts, decommissioned clusters, or obsolete manual steps. Document active systems only. If something was removed, delete its documentation.
+
+- BAD (permissions guide): `Both predecessors are deleted: scripts/configure_alloydb_permissions.sh and scripts/configure_alloydb_permissions_shared_cluster.sh.`
+  GOOD (permissions guide): `Permissions are defined in terraform-spoke/alloydb_grants.tf and applied during CI deployment.`
+- BAD (runbook): `An earlier version of this runbook recommended raw SQL updates with force_reextract, which failed. Use admin_cli.py instead.`
+  GOOD (runbook): `Reset patient runs using admin_cli.py:`
+
+Tombstone documentation wastes reader attention and confuses new engineers and AI agents about which artifacts are actively maintained.
+
+### RULE-D: Don't Argue with Imaginary Reviewers (high)
+
+**Directive:** Do not justify architectural or implementation choices against hypothetical future refactors or imaginary reviewer critiques. State the invariant directly without conversational defense.
+
+- BAD (code comment): `Collapsing this shape here means a future change to the claim-fencing rule won't drift between the two call sites and leave stale tokens.`
+  GOOD (code comment): `Resets the task claim token and retry timestamp atomically.`
+- BAD (architecture doc): `Deliberately not derived from is_active: ACCEPTED is terminal but must take the no-op path, not resubmission.`
+  GOOD (architecture doc): `Only REJECTED and ERROR statuses require resubmission. Terminal statuses like ACCEPTED are no-ops.`
+
+Defensive explanations read like PR review arguments, adding noise and cluttering the public contract with speculative counterfactuals.
+
+### RULE-E: Don't Convert Prose into Bullets Unless It's a Genuine List (medium)
+
+**Directive:** Keep prose in paragraphs when ideas connect by cause, argument, or narrative. Use bullets only for genuinely parallel enumerations (endpoints, config options, checklist steps). Don't force a 3-item "first, second, third" triad where 2 items or a plain sentence fit.
+
+- BAD (design doc): a 4-bullet list where each bullet is a clause of one causal sentence ("Two-tower retrieval" / "Because the query embedding caches" / "And the document index updates nightly" / "Without re-running inference").
+  GOOD (design doc): `We chose two-tower retrieval because the query embedding caches across sessions and the document index updates nightly without re-running inference.`
+
+Bullets read as "organized," so models reach for them by default — but each bullet strips the connective tissue (because, therefore) the argument needs.
+
+### RULE-F: Don't Use Em/En Dashes as Casual Punctuation (medium)
+
+**Directive:** Use a comma for an appositive, a semicolon for linked independent clauses, a colon for an expansion, parentheses for an aside — not an em or en dash. Numeric ranges (`2020-2026`) and paired names are unaffected; those are hyphens, not this rule's target.
+
+- BAD: `The deploy rolled back automatically — because the health check failed — within 90 seconds.`
+  GOOD: `The deploy rolled back automatically because the health check failed, within 90 seconds.`
+
+LLMs produce dashes at several times a skilled human writer's rate, and readers now recognize the cadence as an AI-tell.
+
+### RULE-G: Don't Start Consecutive Sentences with the Same Word (medium)
+
+**Directive:** Vary the opener across consecutive sentences — pronoun subjects ("It", "We", "The") are the most common offenders once a fluent opener gets reused.
+
+- BAD (postmortem): `It started at 14:00 UTC. It lasted 37 minutes. It affected 12% of users.`
+  GOOD (postmortem): `The incident started at 14:00 UTC, lasted 37 minutes, and affected 12% of users.`
+
+Once an opener works, next-token sampling keeps reusing it — the paragraph reads as template-filled even when each sentence is individually correct.
+
+### RULE-H: Don't Overuse Transition Words (medium)
+
+**Directive:** Don't open a sentence with "Additionally"/"Furthermore"/"Moreover"/"In addition"/"Notably" unless the logical move (contrast, concession) genuinely needs flagging — usually the content alone makes the connection.
+
+- BAD (release note): `This release adds OAuth support. Additionally, it fixes the CSV export crash. Furthermore, it improves startup time.`
+  GOOD (release note): `OAuth support lands in this release. The CSV export crash is fixed. Startup time drops from 4.2s to 1.8s.`
+
+These transitions appear at far higher frequency in LLM output than in skilled technical prose, producing a distinctive, recognizable cadence.
+
+### RULE-I: Don't Close Every Paragraph with a Summary Sentence (medium)
+
+**Directive:** Don't end a body paragraph with a sentence restating its own point ("In summary, ...", "Overall, this means ..."). Reserve summary closers for the final paragraph of a piece, or a long section meant to be skimmed. Test: if deleting the closer leaves the point intact, delete it.
+
+- BAD (design doc): `We chose two-tower retrieval because query embeddings cache across sessions. Thus, the architecture is well-suited to our caching strategy.`
+  GOOD (design doc): `We chose two-tower retrieval because query embeddings cache across sessions.`
+
+The closer signals "I am finishing this thought" without adding information; a skimming reader has already moved on.
+
+### RULE-J: Keep Terms Consistent; Don't Redefine Abbreviations Mid-Document (medium)
+
+**Directive:** Once a term or abbreviation is defined, keep using that exact form. Don't alternate synonyms for the same thing ("the gateway" / "the ingress layer" / "the front door"), and don't re-expand an abbreviation already defined earlier.
+
+- BAD (API doc): `The /users endpoint returns user objects. ... later ... The user endpoint supports filtering. ... later ... Our user resource accepts query parameters.`
+  GOOD (API doc): `The /users endpoint returns user objects. ... later ... /users supports filtering. ... later ... /users accepts query parameters.`
+
+Varied terminology masks whether a new term is the same entity or a new one, forcing the reader to check each time.
+
+### RULE-K: Don't Use Self-Certifying Language (medium)
 
 **Directive:** Cut "honestly", "frankly", "candidly", "to be clear", "truthfully". State the thing plainly instead of announcing that you're about to be honest about it. Still state limitations and corrections — just without the announcement.
 
@@ -250,3 +263,21 @@ A contraction inside otherwise-formal prose reads as a register break, even thou
   GOOD (postmortem): `The root cause was a missing index, not the query itself.`
 
 The qualifier implies every other sentence might not be honest, and adds nothing the plain statement doesn't already carry.
+
+### RULE-L: Title-Case Section Headings (low)
+
+**Directive:** Capitalize first word, last word, and all major words in headings; lowercase articles, coordinating conjunctions, and short prepositions. Applies to Markdown/RST headings unless the repo's own convention is sentence-case — check existing docs before applying.
+
+- BAD (README): `## Getting started with the API`
+  GOOD (README): `## Getting Started with the API`
+
+LLMs default to sentence-case headings from docs-site training data; in a title-case repo this reads as unedited.
+
+### RULE-M: Prefer Full Forms over Contractions in Formal Prose (low)
+
+**Directive:** In formal technical prose (specs, API docs, formal design docs), write "it is" not "it's", "cannot" not "can't". Contractions are fine in informal registers (release notes, commit messages) — pick a register and hold it within one document.
+
+- BAD (API spec): `If the request body can't be parsed, the endpoint won't return a 200 response.`
+  GOOD (API spec): `If the request body cannot be parsed, the endpoint does not return a 200 response.`
+
+A contraction inside otherwise-formal prose reads as a register break, even though the meaning parses fine either way.
