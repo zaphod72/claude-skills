@@ -46,15 +46,16 @@ implement(unit_of_work, pr_branch, worktree):
         loop:                                         # the final gate — format before the final test run
             run(every_step_that_can_modify_a_file)     # format, imports, lint --fix, types
                                                         # scoped to MY files, never repo-wide
-            run(tests_selected_from_diff)              # last, so formatting cannot force a redo
-            if all passed: break
-            fix_failures()
+            run(tests_grepped_by_changed_symbol)       # last, so formatting cannot force a redo
+            if all passed: break                        # symbols across the whole test tree, never
+            fix_failures()                              # the files named after the ones I changed
 
         commit(unit, by_explicit_path)                 # incrementally, before reporting.
                                                         # never `git add -A`, never stash
-    push(pr_branch)
+        push(pr_branch)                                # every commit, not once at the end — an
+                                                        # interruption then strands nothing
     assert rev-parse(f"origin/{pr_branch}") is not None   # read `## head_sha` back from origin
-                                                        # after this push, never from local HEAD —
+                                                        # after your last push, never local HEAD —
                                                         # a SHA that never reached origin merges nothing
 
     # never writes the plan doc — deviations go upward as data
@@ -105,8 +106,10 @@ that buys nothing.
 The **final gate** is the last file-modifying pass plus the test run that follows it, run once
 before a unit's commit. `SKILL.md` states the ordering — every file-modifying step first, the test
 run last, because formatting after a test run forces it to be repeated. What's specific to you:
-scope every step to the files you touched, never repo-wide, and select the tests from your own
-diff. Test as often as you like while a slice is still red-green-refactor; this ordering governs
+scope every step to the files you touched, never repo-wide, and select the tests by grepping the
+symbols you changed across the whole test tree — the files named after your modules are not the set,
+because callers sit in files named after the behaviour they test. Report the count that grep
+selected under `## verification`. Test as often as you like while a slice is still red-green-refactor; this ordering governs
 only the last run before a commit.
 
 Its exit code only says the command returned, not what it covered — `brief-contract.md`'s "Exit
@@ -114,7 +117,9 @@ code is never the check" is what you report against.
 
 ## Committing and reporting
 
-Commit incrementally, by explicit file path, before you report. Never `git add -A`; never
+Commit **and push** incrementally, by explicit file path, before you report. Committing survives
+your own exit; pushing is what survives the machine losing its view of your work, and a run killed
+by a rate limit strands every commit that never left the worktree. Never `git add -A`; never
 `git stash` — see `git-worktree-topology` §2b: the stash is repository-wide, and a shared one
 silently swaps another worktree's uncommitted work into yours.
 

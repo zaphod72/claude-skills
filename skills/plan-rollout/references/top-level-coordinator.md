@@ -6,7 +6,8 @@ review surface, all of which the loop below refers to by name.
 
 ## What this actor does with its own hands
 
-Docs, tickets, and minor fixes — never implementing a ticket. Implementing one, including any fix
+Docs, tickets, and minor fixes — never implementing a ticket, and a "minor fix" never covers a
+finding a sub-agent surfaced as deliberately not actioned. Implementing a ticket, including any fix
 round on a PR, is a second-level coordinator's job (`second-level-coordinator.md`); dispatch it.
 
 Otherwise: it always has a base branch, cutting one when none was given; it owns the run directory
@@ -16,6 +17,25 @@ plan — even for a single-aspect plan; it performs every aspect-base → base m
 closing base → trunk PR without merging it; it seeds review recommendations before coding starts;
 and it corrects the plan doc in place when falsification or repartitioning moves it (`plan-docs`
 owns rewrite-in-place, never append).
+
+Its **context is the scarce resource**, and tracker API payloads drain it fastest. One run spent a
+fifth of this actor's window absorbing Jira responses — sixteen `transitionJiraIssue` calls at
+~5,700 characters each to change one status field. Deciding a ticket's status is this actor's job;
+absorbing the payload is not, and the two get conflated because each call looks individually cheap.
+
+- **Past about three tracker calls, hand a decided table down** — ticket → transition, comment,
+  labels — to one sub-agent that executes the batch and reports one line per ticket.
+- **A finding a sub-agent surfaces as deliberately not actioned gets its own dispatch.** One such
+  gap drew fifteen tool calls of write-code, run-tests, debug and commit from this actor's own
+  hands, on a run where a sibling batch of five comparable fixes was correctly dispatched.
+
+Reading this file, cross-session peer messages, the briefs it writes and the ledger it keeps are the
+job rather than overhead to trim — the ledger in particular is a small cost here that keeps every
+sub-agent's context small.
+
+**Run `ListAgents` at dispatch time**, not when something looks wrong. Unrelated commits describing
+a batch that resembles this run are a routine sight, and one call settles whether a second
+orchestrator is live before it becomes an alarm.
 
 ## Run artifacts this actor owns
 
@@ -297,6 +317,13 @@ coordinate_plan(plan):
         # disqualifies it from synthesising, and that is deliberate.
 
     # This run never RUNS either pass, and never compares the two.
+
+    # No PR inside the stack got CI, so nothing has yet run the gates over the
+    # whole aspect. Run them on the merged base BEFORE the closing PR opens --
+    # see "No CI inside the stack, before the closing PR".
+    gates = await(dispatch(role = VERIFY, model = "sonnet", brief = [base, full_gate_commands]))
+    if gates.failed: AWAIT_DECISION()
+
     pr_url = await(dispatch(role = PR_BODY, model = "sonnet", fresh = TRUE,
                             brief = [base, real_trunk, inner_prs_with_tickets_and_round_counts,
                                      notes, tickets, runbook(trunk_dependent),
@@ -380,6 +407,13 @@ An auditor that returns no verdict hit its turn budget rather than failing. Its 
 disk and partly filled: read it, treat every `NOT CHECKED` heading as unchecked rather than clean,
 and resume that auditor on the headings it did not reach instead of dispatching a fresh one.
 
+**Resolve unit and branch names from the ledger, never from the run's branch prefix.** This actor
+names base branches after the run and PR branches after the work, so `git branch -r | grep <ticket>`
+cannot return a PR branch under any circumstances, and its silence carries no information at all.
+`rollout-db query "SELECT unit FROM units WHERE run = '<ticket>'"` is the record.
+`claims-and-scope-discipline` holds the general form: before offering a command as evidence, ask
+what it would print if the claim were false.
+
 Then this actor **re-verifies exactly one claim with its own hands** — one command — and acts only
 on discrepancies. One check catches an auditor that rubber-stamped; a second is this actor re-reading
 the report it just paid not to read.
@@ -423,14 +457,47 @@ also performs `cleanup(header.branch)` — the branch delete and worktree remova
 landed; this actor never runs a git mutation (merge, push, branch create or delete, worktree add or
 remove) inline.
 
+## No CI inside the stack, before the closing PR
+
+Read the repo's `pull_request:` trigger list before writing a word about CI into a brief. Where it
+names `branches: [main, staging, alloy-db]`, every PR this run opens targets an aspect base or the
+run base, so each one gets **zero checks**, and the closing base → trunk PR is the only one CI ever
+sees.
+
+**Zero checks renders identically to green.** Nothing shows red, no missing-check warning appears,
+and the PR lists as ordinary:
+
+```
+gh pr view 973 --json statusCheckRollup,mergedAt \
+    --jq '{merged:.mergedAt, checks:(.statusCheckRollup|length)}'
+{"checks":0,"merged":"2026-09-15T00:04:39Z"}
+```
+
+Read the **count**, never the colour, and state a PR's status as that count plus its base branch.
+Two consequences bind this actor:
+
+- **"CI runs the full suite on the PR" stays out of every brief** as a reason to select tests
+  narrowly. Inside the stack an agent's own selection is the entire gate, which is what makes
+  `brief-contract.md`'s symbol-grep selection load-bearing rather than tidy.
+- **Run the full verification on the merged base before opening the closing PR** — as a dispatch,
+  like every other repo-touching step. Otherwise the first validation of a whole aspect happens
+  after every internal merge has landed, where a failure has nowhere cheap to go.
+
+Where the human directs small fixes straight to the integration branch with no PR, treat it as a
+**scope test rather than a standing process change**. A one-line change inside one function is
+fine. A shape change across call sites has just lost its only gate: say so, and ask. One such batch
+held five one-liners and one three-call-site shape change, and the shape change broke a test on the
+integration branch.
+
 ## A dispatched second-level coordinator can die mid-run
 
 A dropped connection, a stall, a terminal API error, between one `await_next(pending)` and the next.
-A watchdog turn-limit stop is not one of these — it hits routinely on work of this size and is not
-a logical failure; the agent and its worktree are still there, so assess the tree, then resume it
-with `SendMessage` and a specific next step. Re-dispatching fresh is the wrong default for a
-turn-limit stop, since it discards that worktree state; reserve the three outcomes below for an
-agent that is actually gone. Its `agents` row names the branch and the worktree; the branch, not the
+A watchdog turn-limit stop is not one of these, and neither is a session rate limit (HTTP 429) —
+both hit routinely on work of this size, and the agent and its worktree survive them. Assess the
+tree, then resume with `SendMessage`; `brief-contract.md`'s "A resume brief adds" states what that
+message may assert and what it has to ask. Re-dispatching fresh discards the worktree and every
+file the agent had already read, so reserve the three outcomes below for an agent that is actually
+gone. Its `agents` row names the branch and the worktree; the branch, not the
 row, says what landed. Check what its aspect base branch actually holds — three outcomes:
 
 - **Clean** — nothing landed since the last merge. Relaunch the same brief.

@@ -14,9 +14,9 @@ Every upward field is a fixed `##` heading in the agent's report file, and the r
 `empty_sections` line names every heading whose body came back blank. That line is what makes an
 omission visible to a parent that never reads the report.
 
-Every `report_upward()`, `brief_for(...)`, `brief_for_review(...)`, and `brief_for_fix(...)` called
-in `top-level-coordinator.md`, `second-level-coordinator.md`, and `coding-agent.md`'s pseudo-code
-means the tables below — they do not restate the fields, and neither should you when writing an
+Every `report_upward()`, `brief_for(...)`, `brief_for_review(...)`, `brief_for_fix(...)`, and
+`resume(...)` called in `top-level-coordinator.md`, `second-level-coordinator.md`, and
+`coding-agent.md`'s pseudo-code means the tables below — they do not restate the fields, and neither should you when writing an
 actual brief. Call `AWAIT_DECISION()`, `needs_human()`, `is_cosmetic()`, and `is_trivial()` by name;
 their bodies live in `SKILL.md` and nowhere else.
 
@@ -59,7 +59,7 @@ name lands in `empty_sections`.
 | `## status` | `done` \| `blocked` \| `partial` | Call `AWAIT_DECISION()` for a decision you cannot make |
 | `## agent` | The dispatch name, matching the `agent upsert` row | The name this dispatch is given |
 | `## branch` | Branch name, resolved against `origin` | Your base branch, already pushed |
-| `## head_sha` | Short SHA at `origin` after your last push | Commit incrementally, and before reporting |
+| `## head_sha` | Short SHA at `origin` after your last push | Commit and push incrementally, and before reporting |
 | `## base_at_dispatch` | The base SHA the brief recorded, checked against `origin` rather than quoted back | The base SHA recorded at dispatch |
 | `## worktree` | Absolute path, and whether you created it or were handed it | The worktree path, created at the named base |
 | `## blocked_on` | The decision needed, and the options you see | `AWAIT_DECISION()`; a review agent's BLOCKED verdict lands here, with `status: blocked` |
@@ -143,7 +143,7 @@ downstream can catch after the fact:
    written as a verified fact.
 
 `top-level-coordinator.md` and `second-level-coordinator.md` both point here at the moment they
-describe writing or sending a brief, rather than restating these four checks.
+describe writing or sending a brief, rather than restating these five checks.
 
 ## Every brief
 
@@ -153,12 +153,12 @@ describe writing or sending a brief, rather than restating these four checks.
 | Your assigned file scope; stop and report before leaving it | `## blocked_on`, if it fired, naming the files |
 | Your base branch name, already pushed, and the base SHA recorded now, at dispatch | `## branch`, `## head_sha`, `## base_at_dispatch` — resolved against origin, checked against what was recorded at dispatch, not just quoted back |
 | The worktree path you are to work in, created at the base branch named here | `## worktree`: the absolute path, and whether you created it or were handed one |
-| Commit incrementally, and before reporting | The SHAs, plural → `## evidence` |
+| Commit **and push** incrementally, and before reporting. Committing survives your own exit; pushing survives losing the machine's view of your work, which is what a rate limit takes | The SHAs, plural → `## evidence`, and `## head_sha` resolved at `origin` — the one field that exposes a commit which never left the worktree |
 | The run directory `~/.claude/plan-rollout-runs/<ticket>/`, as an absolute path — never let the agent resolve a working directory itself; a sub-agent can land somewhere else with no error at all | `## files_written` |
 | The facts you verified, each carrying the command that produced it, so the agent need not re-derive them; anything you reasoned out rather than ran, labelled an inference the agent should check | What you verified vs. inferred → `## evidence`; a fact that turns out wrong → `## brief_errors` |
 | **Traps earlier agents hit**, not only interfaces they changed — a DDL splitter that breaks on a semicolon inside a prose comment, a join that silently returns zero rows unless a prefix is stripped, a duplicated block shadowing a live assignment. These cost the discovering agent real time and are invisible in a diff. `rollout-db traps --repo <name> [--path <glob>]` returns them across runs | `## traps`, in the same shape, plus a `trap add` row, so the next brief carries it |
 | Show your work | `## evidence`: commands run, with raw output and counts |
-| **What the verification command actually covers**, read from the task or script definition before the first brief. Nine agents once reported `check-types` clean as evidence their new test files were sound; that task ran the type checker over `src` trees only and had never looked at a test file — run by hand, one test tree held 20 errors. "Exit code is never the check" below generalizes this | `## verification`: the command's scope as the agent understands it, alongside its result |
+| **What the verification command actually covers**, read from the task or script definition before the first brief. Nine agents once reported `check-types` clean as evidence their new test files were sound; that task ran the type checker over `src` trees only and had never looked at a test file — run by hand, one test tree held 20 errors. "Exit code is never the check" below generalizes this. **The inverse too: never infer *unrunnable* from a gate's flag.** `--integration` gates pytest collection, which is not the same constraint as needing a live database — one suite declined as needing infrastructure nobody had wanted only a Docker daemon, its fixture starting and destroying a `testcontainers` Postgres itself, and ran 156 tests in 30.74s. Read the fixture before concluding a suite cannot run here | `## verification`: the command's scope as the agent understands it, alongside its result; for a gate declined as unrunnable, what the fixture actually requires |
 | The numbers you measured, as targets to reproduce. This is the **anti-gaming clause**: a stated number is a target the agent must reproduce, and if its own output differs that is a bug in its work, not a license to adjust the expectation | `## evidence`: the value you actually got, matched against the target or flagged as a discrepancy — never silently rewritten to agree |
 | Name **the discriminating test** — the one test that fails if the design is wrong, called out explicitly so it can't be lost in a list of equals | `## evidence`: confirmation it ran, and its result — silence on this one test is a gap, not a pass |
 | **The disagreement rule, wherever this PR makes a value deterministic:** for every value it pins, write a test in which the *other* source would give a different answer | Those tests, one per pinned value → `## evidence`. A fixture where both sources agree proves nothing about which one the code read — that is how a wrong-source bug survives a fully green suite |
@@ -175,7 +175,8 @@ describe writing or sending a brief, rather than restating these four checks.
 | If you need a decision you cannot make, call `AWAIT_DECISION()` | `## status: blocked` plus `## blocked_on`: the decision needed and the options you see |
 | Where a known defect stands between you and the task, it is named here as a decision with options — never as a caution to watch for | `## deviations`: which option you chose, and why — a workaround picked under budget pressure stays visible instead of silent |
 | Where your scope is one file, you may report which of your own tests went red. You may never report that a mutation reddens "only" those — cross-file kills are invisible from inside one file | `## evidence`: which of your own tests went red, scoped honestly. An unqualified "only" is a finding the parent checks against the cross-file pass in `review-efficacy-axis.md`, not a result it relays |
-| Run the PR's own test files first — they catch real failures in seconds — then background any long suite rather than blocking on it | `## verification`: whether the long suite ran inline or was backgrounded, and its result once it lands |
+| Select the tests by grepping the **changed symbols** across the whole test tree — "Select tests by symbol, not by filename" below | `## verification`: the count of test files the grep selected, and why — an under-selection is invisible to a parent without it |
+| Run that selected set first — it catches real failures in seconds — then background any long suite rather than blocking on it | `## verification`: whether the long suite ran inline or was backgrounded, and its result once it lands |
 | Record how the review went | `## review_notes`, and how many rounds it took |
 | Record tracker changes; every new ticket gets exactly one triage label at creation — `ready-for-agent` when fully specified, otherwise `ready-for-human` — plus the labels `common-facts.md` names; never leave a new ticket unlabelled or on `needs-triage` | `## tickets`, with keys and labels, each also a `ticket add` row |
 | Say which skills helped and which did not | `## skills_used`: the skill-efficacy entries |
@@ -204,6 +205,23 @@ describe writing or sending a brief, rather than restating these four checks.
 A fix agent's report is the standard contract above plus this fix-round summary — not a
 replacement for either.
 
+## A resume brief adds
+
+An agent that stops without reporting — a rate limit, a turn budget — has not failed logically. Its
+worktree is intact and its context still holds everything it read, so resume it with `SendMessage`.
+A fresh dispatch throws both away and pays to re-derive them.
+
+What each side knows divides cleanly. You can see the **artifacts**: the branch, the head SHA at
+`origin`, what is pushed, which PRs are open or merged. Only the agent knows its **phase**, because
+commit subjects are inference while the review file, the tracker and the agent's own memory are
+record. Telling an agent which phase it is on is the parent guessing at the one thing the child
+knows for certain; `second-level-coordinator.md` prices that guess in review rounds.
+
+| Brief says (downward) | Report must carry (upward) |
+|---|---|
+| The artifacts you verified — branch, head SHA at `origin`, what is pushed, which PRs are open or merged | `## branch`, `## head_sha`: resolved again against `origin`, not quoted back |
+| "Report your current phase and next step before you resume" — asked, never asserted | The answer in the agent's reply, before it restarts work; for a review or fix agent, the round it resumed at → `## review_notes` |
+
 ## Exit code is never the check
 
 A verification's exit status says the command ran and returned; it says nothing about what it
@@ -228,6 +246,21 @@ not its exit code, under `## verification` and `## evidence`; a coordinator read
 reconciles the count against what it expected before treating the report as a result — the same
 standard "What the parent does with what comes back" states for every other claim applies here
 too.
+
+## Select tests by symbol, not by filename
+
+"Select tests from the diff" reads as "the tests named after the files I changed", and callers live
+in files named after the behaviour they test, not the module they call. An agent that switched
+`fhir_persistence.py`'s three outbound calls from a query param to a header ran the five
+`test_fhir_persistence_*.py` files and reported 36 green. Eleven test files exercise those
+functions; `test_auth_logic.py` asserted the old `kwargs["params"]["smart_session_id"]` shape and
+went red on push. The agent did exactly what it was told.
+
+Brief it as **grep the changed symbols across the whole test tree**, and pair it with the count of
+files that grep selected. The count is what makes an under-selection visible to a parent that never
+reads the test list — this file's opening principle, applied where the instruction otherwise travels
+alone. Inside a stack that selection is the entire gate, for the reason
+`top-level-coordinator.md` gives.
 
 ## What the parent does with what comes back
 

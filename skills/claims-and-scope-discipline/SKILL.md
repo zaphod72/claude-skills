@@ -1,6 +1,6 @@
 ---
 name: claims-and-scope-discipline
-description: "Verifying a written claim about code — a review finding, a ticket, a plan step — before acting on it, and deciding what a fix may touch. Use when a finding's citation does not match the code, when a ticket prescribes the fix or quantifies its blast radius, when a ticket reads Done and the repo has more than one branch lineage, when a defect crosses a service or scope boundary, when two tickets describe one defect, when a diff looks small enough to skip review, when verifying a claimed deletion or a check that could not run, when shared test infrastructure must change, when a change implies deploy-time ordering, when several findings cluster in one area, or when separately-reviewed branches will collapse into one integration merge. Not grouping already-verified findings into a fix plan (root-cause-fix), orchestration control flow or agent briefing (plan-rollout), or git/worktree mechanics (git-worktree-topology)."
+description: "Verifying a written claim about code — a review finding, a ticket, a plan step — before acting on it, and deciding what a fix may touch. Use when a citation does not match the code, when a ticket prescribes the fix, quantifies blast radius, reads Done, belongs to another lineage, or quotes a SHA, file count or tooling claim, when a defect crosses a scope boundary, when two tickets describe one defect, when a diff looks too small to review, when verifying a claimed deletion, or a check that could not run or could not have failed, when a PR shows no CI checks, when a rule and a measurement disagree, when a claim is relayed between sessions, when shared test infrastructure changes, when a change implies deploy-time ordering, when several findings cluster in one area, or at an integration merge of separately-reviewed branches. Not grouping already-verified findings into a fix plan (root-cause-fix), orchestration control flow or agent briefing (plan-rollout), or git/worktree mechanics (git-worktree-topology)."
 ---
 
 # Claims and scope discipline
@@ -8,13 +8,16 @@ description: "Verifying a written claim about code — a review finding, a ticke
 A review finding, a ticket, and a plan step are the same object: **a written claim about code at a
 moment**. §1–5 are what a reader owes such a claim before implementing it. §6–13 are the other
 side — what a review, a diff, or a green check cannot show, and so what its silence does not prove.
+§14–16 are the evidence itself: a check that could not have failed, a general rule standing in for
+the artifact it describes, and what a claim loses when it travels between sessions.
 
 **Before implementing any finding: classify its drift (§1) and confirm it belongs to this scope
 (§6).** With every finding classified and scoped, **call `/root-cause-fix`** to group them by
 cause. That skill sends classification back here, so the two are a hand-off, not a loop.
 
-Every rule here came from one 24-hour run — an 81-ticket epic across 15 repo aspects, implemented
-by parallel agents. Each cost real work to learn; none is speculative.
+Every rule here came from a real run: §1–13 from one 24-hour, 81-ticket epic across 15 repo
+aspects; §14–16 from multi-agent rollouts in the same repos. Each cost real work to learn; none is
+speculative.
 
 ## 1. Stale or wrong — classify every drift
 
@@ -39,7 +42,19 @@ counts are cheaper but not free — they size the review gate (§7) and the test
 **Require drift entries *classified*, not merely listed**, in your notes and in any brief you write
 (`plan-rollout` (`references/brief-contract.md`) for the rest of what a brief owes its recipient).
 
-## 2. "Done" is scoped to a lineage, not to the repo
+## 2. A ticket is a claim about a moment and a lineage
+
+**Triage a batch by lineage before reading any description in detail.** Where a repo has more than
+one active lineage, the cheapest discriminator runs first:
+
+```
+git merge-base origin/<working-lineage> origin/<other-lineage>
+```
+
+Empty output means the two share no commit, and every ticket written against the other one is a
+cross-lineage question before it is a technical one. Of ten tickets in one batch, five were written
+against a lineage sharing no commit with the working branch — one command, ahead of five detailed
+reads that could not have settled it.
 
 **Where a repo has more than one active lineage, a cited ticket's Done status is scoped to *a*
 branch, not proven for *this* one.** Find the PR that actually closed the ticket, then:
@@ -57,6 +72,26 @@ defect was live here, tracked by nothing.
 **Sweep once one instance turns up** — the gap plausibly exists on every ticket closed by the same
 source. One bundled PR closed five tickets into the other lineage, and two later drew independent
 fixes here (overlapping scope, not propagation), so "some of these are fine" stops short.
+
+**Every field a tracker carries describes the state when it was written.** Resolve each one against
+the repo at dispatch time, however recently the ticket was triaged. A branch head quoted from a
+ticket's "Work done" section was six commits behind `origin`, and the brief built on it had the file
+count wrong by two, because `git rev-parse origin/<branch>` never ran. A ticket *title* —
+"`poe check-types` skips every test directory" — was briefed as current fact when the ticket sat in
+Testing *because it had been fixed*, the fix already an ancestor of trunk. A title is as dated as a
+SHA.
+
+**Say which kind of not-applicable.** Three are distinct, and collapsing them into one verdict loses
+the only one that closes anything:
+
+| Verdict | What the repo shows | What it implies |
+|---|---|---|
+| **Code absent** | the mechanism the ticket describes does not exist on this lineage | live for its own branch; nothing to do here |
+| **Hazard absent** | the subject exists; the duplication or race the ticket names does not | live for its own branch — and say which of the two you measured (§14), because the symbol being present is not the finding |
+| **Already satisfied** | this lineage already does what the ticket asks | no work on *either* lineage — the one verdict that settles the ticket outright |
+
+**Comment with the evidence; leave the status alone.** A ticket that does not apply to your lineage
+is still live for its own, and a terminal transition destroys that. The human decides.
 
 ## 3. A prescribed fix is a claim too — check the mechanism, not the mandate
 
@@ -238,6 +273,49 @@ is the fixable part.
 
 **Ticket the set, not one of thirty-one call sites.** A lone corrected site among thirty wrong ones
 hides the pattern instead of starting to fix it.
+
+## 14. A check that cannot come back negative is not a check
+
+**Before offering a command as evidence, ask what it would print if the claim were false.** If the
+answer is "the same thing", it cannot falsify the claim and is decorative — and the conclusion can
+still be right, which is what lets the method survive until it meets a claim that is wrong.
+**State what you measured, not what it implies:** *symbol X is absent* and *the hazard X describes
+is absent* are different findings, and the gap between them is where a live defect gets closed.
+
+§10 covers a check that could not **run**; this one covers a check that ran and could not falsify.
+Both arrive downstream as coverage.
+
+`references/falsifiable-evidence.md` — read when choosing or citing a command as evidence; it holds
+the six instances, the two commands that answer them, and the measured-versus-implied gap.
+
+## 15. When a rule and an artifact disagree, read the artifact
+
+§1–5 are about trusting a written claim too readily. This is the symmetric error — **distrusting a
+result on a general rule's say-so**, which costs a real measurement and looks like rigour while
+doing it. A known hazard is not evidence that it occurred. Reading the artifact is nearly always
+cheaper than the argument about whether the rule applies: a grep, a log, an import trace.
+
+Three corollaries. Scope a test re-run by **import graph**, not by package or directory. **Absence
+of a stated reason is weak evidence of an absent reason.** **Pick the hunk to verify by blast
+radius**, not by how cheap it is to confirm.
+
+`references/rule-versus-artifact.md` — read when a general rule and a specific result disagree,
+before scoping a test re-run, or before giving another session a file-level scope assurance.
+
+## 16. A claim that travels between sessions degrades
+
+**Send the enumeration, never its shape.** Summarising an ordered chain for another session, send
+the grep output — "it checks A first, then B" is exactly the form that silently drops C, and the
+loss happens in the summary, not in the source. **Mark every cross-session claim
+verified-against-code or read-from-docs**; the label certifies provenance, not fidelity, so it
+catches only half the failure and is still worth carrying.
+
+**Receiving a claim that names a source, open the source** — and read the branch *body*, not its
+name. **Recompute a predicted total from your own position**; it encodes the set of writers its
+author knew about. **Run `ListAgents` before you dispatch**, not once something looks wrong.
+
+`references/cross-session-claims.md` — read before relaying a claim to another session, or when
+acting on one you received.
 
 ## Self-improvement protocol
 

@@ -43,3 +43,27 @@ Skill snippets run against BSD tools, not GNU. Two that have already bitten:
   `head: illegal line count`. Use `tail -n +N` against a reversed sort instead.
 - **`date -d` does not work.** BSD `date` uses `-v`. Prefer a count-based rule over an
   age-based one when a skill needs to prune or filter by recency.
+
+## Split a skill by circumstance of use
+
+A `SKILL.md` carries what **every** invocation needs. Material that fires only under a particular
+circumstance goes in `references/<aspect>.md`, with a one-line pointer where that circumstance
+comes up:
+
+```
+`references/test-infra-baseline.md` — read before changing shared test infrastructure.
+```
+
+**Split by circumstance, never by length or by topic tidiness.** The reader is an agent deciding
+what to load before it knows what it will find, so the pointer has to name the moment — *read
+before changing shared test infrastructure*, not *more on testing*. Splitting by subject scatters
+material one invocation needs across two files and buys nothing.
+
+**What stays behind is the rule itself**, in a sentence or two, never a bare "see elsewhere". A
+reader who never opens the reference file still gets the rule; the file holds the instances, the
+commands, and the worked evidence behind it. Open each reference file by naming the section it
+backs — `The full case for SKILL.md §9 — …` — so a file opened on its own says what it belongs to.
+
+`skill-check`'s `body.max_lines` is set to `warn` in `skill-check.config.json`, so length is a
+smell it reports rather than a gate. A long `SKILL.md` every invocation reads end to end is fine;
+a short one hiding a circumstance-gated procedure behind a subject heading is not.

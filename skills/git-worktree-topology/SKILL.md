@@ -1,6 +1,6 @@
 ---
 name: git-worktree-topology
-description: "Git ref-naming, worktree-isolation, and stacked-PR merge mechanics for running multiple agents in parallel against one repo. Use when planning or dispatching parallel/concurrent subagents that each get their own branch or worktree, when designing a branch-naming scheme for a multi-PR or stacked-PR run, when an agent hits 'cannot lock ref' / 'already exists' on branch creation, or when deciding how to derive a PR's base branch, whether to squash a stacked PR, or whether to force-push into a chain. Not about orchestration control flow (dispatch/resume/pause of the agents themselves) — only the git/worktree mechanics underneath it."
+description: "Git ref-naming, worktree-isolation, and stacked-PR merge mechanics for running multiple agents in parallel against one repo. Use when planning or dispatching parallel/concurrent subagents that each get their own branch or worktree, when designing a branch-naming scheme for a multi-PR or stacked-PR run, when an agent hits 'cannot lock ref' / 'already exists' on branch creation, or when deciding how to derive a PR's base branch, whether to squash a stacked PR, or whether to force-push into a chain, when a wave dispatches against a base branch cut earlier, or when reading branch or file state another agent's worktree or a merged PR produced. Not about orchestration control flow (dispatch/resume/pause of the agents themselves) — only the git/worktree mechanics underneath it."
 ---
 
 # Git worktree topology for parallel agents
@@ -156,6 +156,35 @@ Option 1 is the fallback for when the merge is blocked (e.g. pending human revie
 yet available). Decide this per stage, not once for the whole run — availability can change stage
 to stage.
 
+**A branch's base is a fact about when it was cut, not about where the run is now.** Cutting every
+aspect base at setup — one dispatch, one approval, all from the run base's current SHA — is correct
+at the moment of creation and wrong by the time a later wave dispatches. Wave 1 merges into the run
+base; a wave-2 aspect base cut at setup still points at the pre-wave-1 SHA, so wave 2 builds against
+a tree holding none of wave 1's diff, which is the dependency the wave ordering exists to enforce.
+
+Nothing surfaces it. Every branch exists and is valid, the ledger reads wave 1 `done` and wave 2
+`pending`, and it is not a conflict — wave 2's PRs build, test and merge cleanly against the stale
+base and drop the dependency in silence. What does surface is a sub-agent that cannot find work
+that landed: one run renamed `_get_now_date` to `resolve_reference_date` in wave 1, and a wave-2
+agent on a stale base greps for the new name, finds nothing, and reasonably concludes the
+coordinator's trap rows are wrong.
+
+**Cut an aspect base at the moment its wave dispatches.** Where bases were pre-cut, refreshing them
+is a recorded step of the wave's dispatch, not something remembered:
+
+```
+git rev-list --count <run-base>..<aspect-base>   # what the aspect base carries alone
+git rev-list --count <aspect-base>..<run-base>   # landed work the aspect base is missing
+```
+
+The second count is the discriminator — non-zero at dispatch time means the base is stale. When the
+first count is `0` the base carries nothing of its own, so re-point it with
+`git branch -f <aspect-base> <run-base>`; when it is non-zero, merge the run base in instead,
+because re-pointing would discard real commits. Either way git refuses while the base is checked
+out — `fatal: cannot force update the branch 'x' used by worktree at ...` — so release that
+worktree first. Merging a run base into an aspect *base* is not the integration-into-aspect merge
+forbidden below: nothing is stacked on it yet, and there is no PR diff to pollute.
+
 **Never merge the integration branch into an aspect branch.** When an aspect branch and the
 integration branch have both appended to one shared file and conflict at merge, the reconciliation
 is directional: land the integration-side version on the integration branch, then have the aspect
@@ -169,6 +198,28 @@ stage N to merge, *and* separately forbids the agents from merging into the inte
 themselves, then nothing can ever start stage N+1 without a human doing the merge. That's fine if
 it's intended — but confirm it's intended, because unnoticed it's a silent stall with no error to
 surface it.
+
+**Read `origin/<branch>` after a fetch; a local branch ref answers a different question.** One
+branch, three refs, and in a parallel run they routinely disagree:
+
+- `refs/heads/<b>` moves when *this* checkout commits, merges or resets. A fetch never moves it.
+- `refs/remotes/origin/<b>` moves when you fetch or pull, and not otherwise.
+- The branch on the remote moves when any agent pushes, and when a PR merges on the forge.
+
+A coordinator's own checkout does none of the run's work. Merges land in a sub-agent's worktree and
+get pushed, or on the forge when a PR is merged, and neither touches the coordinator's
+`refs/heads/<b>` — reading it is reading your own history, not the run's. One coordinator read a
+merged worker loop from its local ref, found the pre-change code, and concluded a PR's split had
+never landed.
+
+Worktrees of one `.git` do share `refs/heads`, so a sibling worktree's *local* commit moves the ref
+normally. That is what makes the failure selective, and so easy to trust wrongly: the work that
+goes missing is exactly the work that left via the remote.
+
+Fetch first, every time — before a fetch, `origin/<b>` is a cache that is stale in precisely the
+same way. Then read with `git show origin/<b>:<path>` and `git log origin/<b>`.
+`claims-and-scope-discipline` owns the general rule that a command which cannot return the
+disproving case is not evidence; this one is only about which ref tracks what.
 
 ## Self-improvement protocol
 

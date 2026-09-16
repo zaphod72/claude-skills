@@ -175,8 +175,11 @@ Before what might be the final commit, run every file-modifying step first — f
 ordering, lint `--fix`, type fixes — **then** the final test run. Formatting after a test run forces
 that test run to be repeated.
 
-**Select tests from the diff.** Run the full suite only when it is genuinely necessary; CI runs it
-on the PR. (A repo's own memory carries the commands; this states the rule.)
+**Select tests by grepping the changed symbols across the whole test tree**, not by filename —
+`references/brief-contract.md`, "Select tests by symbol, not by filename", owns why and the count
+that pairs with it. Run the full suite only when it is genuinely necessary; inside a stack that
+selection is the whole gate, since a repo's `pull_request: branches:` list may not name an aspect
+base. (A repo's own memory carries the commands; this states the rule.)
 
 ### Always use worktrees, and name the base explicitly
 
@@ -222,6 +225,7 @@ fetch it.
 | Base branch → trunk | **The human.** The top-level coordinator opens this PR and leaves it |
 
 A coordinator never performs a git mutation — merge, push, branch create or delete, worktree add or
-remove — with its own hands; every one above is a dispatch. One actor's dispatch performs each
+remove (building a worktree to run the gates in, and tearing it down, are both) — with its own
+hands; every one above is a dispatch. One actor's dispatch performs each
 level's merges in sequence, so no ordering queue is needed. A merge conflict between two aspect base
 branches is a `needs_human()` stop.

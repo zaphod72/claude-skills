@@ -96,6 +96,14 @@ The `traps` table is the durable half and the message is the timely one: `rollou
 sibling that has already finished cannot be messaged, so the ledger row is the one that must always
 be written.
 
+**A predicted total is not one of them.** A count you work out for after both aspects land — "once
+these merge, `check-event-types` reads 290" — encodes the set of writers you knew about when you
+computed it, so it is a tripwire for you and nobody else. One handed to a sibling omitted that
+sibling's own pending literal by construction, and adopting it would have made their work read as a
+stray arriving from nowhere. Recompute from your own position at the moment you need the number;
+never carry one forward, and never adopt one a sibling computed. The general form is
+`claims-and-scope-discipline` §16.
+
 **Fallback when `SendMessage` to a named sibling fails** (from an efficacy log, not verified in this
 skill): `SendMessage` to a sibling coordinator by its `plan-rollout-slc-<aspect>` name has been
 reported unreachable ("no agent named ... is reachable") even when the brief named that sibling as
@@ -134,6 +142,15 @@ doing anything, and appends its own findings or fix-round summary after. That fi
 **round memory** — the mechanism that lets round 2's reviewer see round 1's findings and fixes
 without this coordinator carrying either in its own context (goal 6). See Review artifacts, below,
 for what else the file holds and where it lives.
+
+**A resumed agent is asked which round it is on, never told.** Commit subjects are inference: a
+`test:` → `fix:` → `docs:` run reads equally as "build plus one fix round, review pending" and "two
+review rounds already closed". The review file above, the tracker, and the agent's own memory are
+the record. One coordinator read its stalled agent's eight pushed commits correctly and then told it
+to resume at round 2, which it was already past — and with a cap of three, that guess spends the
+round standing between this PR and the escalation PR. State the artifacts you verified — branch,
+head SHA at `origin`, what is pushed, which PRs are open or merged — and ask for the phase
+(`brief-contract.md`, "A resume brief adds").
 
 ### The fix-round summary
 
@@ -327,11 +344,12 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
                                    brief = brief_for(slice, run_dir)))
 
         deviations = []
-        # A coding or review agent that stops on a watchdog turn limit is not a failure — it hits
-        # routinely on work this size, and the agent and its worktree are still there. Assess the
-        # tree, then resume it with `SendMessage` and a specific next step; re-dispatching fresh is
-        # the wrong default, since it discards that worktree state (top-level-coordinator.md's
-        # die-mid-run section covers the same distinction one level up).
+        # A coding or review agent that stops on a watchdog turn limit or a session rate limit
+        # (HTTP 429) is not a failure — both hit routinely on work this size, and the agent and its
+        # worktree survive them. Assess the tree, then resume with `SendMessage`: state the
+        # artifacts, ask the phase (brief-contract.md, "A resume brief adds"). Re-dispatching fresh
+        # discards that worktree state (top-level-coordinator.md's die-mid-run section covers the
+        # same distinction one level up).
         while agents NOT all reported:
             header = await_next(agents)                    # the routing header, not the report
             verdict = audit(header)                        # the evidence check — references/auditor.md

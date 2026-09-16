@@ -47,7 +47,8 @@ half-written skill or malformed frontmatter left in place overnight or between c
   reference file, or agent definition you edit.
 - Editing anything under `skills/**/*.md`: read `rules/skill-authoring.md` first. It
   documents a positional-argument substitution trap in fenced code blocks and a BSD- vs
-  GNU-tool portability gap, both silent at review time.
+  GNU-tool portability gap, both silent at review time, and when material belongs in a
+  `references/<aspect>.md` rather than in the `SKILL.md` itself.
 - Commit by explicit path. Never `git add -A`, never `git stash` — this working tree is
   shared by parallel agents, and `refs/stash` is one ref for the whole repo, not
   branch-scoped.
