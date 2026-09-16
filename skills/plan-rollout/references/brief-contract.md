@@ -134,6 +134,13 @@ downstream can catch after the fact:
    churn in a stacked pair is indistinguishable from a real deletion; `git diff <base> <head>` is
    the only thing that settles it. A brief written from `git show <one commit>` can assert a
    deletion that never happened.
+5. **Every fact the brief states carries the command that produced it.** The verified-facts section
+   is the most dangerous text in the run: the brief tells the agent not to re-derive it, so it is
+   trusted by construction, and it is exactly where a dispatcher's unchecked inference lands wearing
+   the voice of a measured fact. Write the command beside each fact. Where you reasoned a fact out
+   rather than ran it, label it an inference and say the agent should check it. On one run a
+   coordinator was wrong four times and a sub-agent caught every one — every error was an inference
+   written as a verified fact.
 
 `top-level-coordinator.md` and `second-level-coordinator.md` both point here at the moment they
 describe writing or sending a brief, rather than restating these four checks.
@@ -148,7 +155,7 @@ describe writing or sending a brief, rather than restating these four checks.
 | The worktree path you are to work in, created at the base branch named here | `## worktree`: the absolute path, and whether you created it or were handed one |
 | Commit incrementally, and before reporting | The SHAs, plural → `## evidence` |
 | The run directory `~/.claude/plan-rollout-runs/<ticket>/`, as an absolute path — never let the agent resolve a working directory itself; a sub-agent can land somewhere else with no error at all | `## files_written` |
-| Facts already verified — do not re-derive them | What you verified vs. inferred → `## evidence` |
+| The facts you verified, each carrying the command that produced it, so the agent need not re-derive them; anything you reasoned out rather than ran, labelled an inference the agent should check | What you verified vs. inferred → `## evidence`; a fact that turns out wrong → `## brief_errors` |
 | **Traps earlier agents hit**, not only interfaces they changed — a DDL splitter that breaks on a semicolon inside a prose comment, a join that silently returns zero rows unless a prefix is stripped, a duplicated block shadowing a live assignment. These cost the discovering agent real time and are invisible in a diff. `rollout-db traps --repo <name> [--path <glob>]` returns them across runs | `## traps`, in the same shape, plus a `trap add` row, so the next brief carries it |
 | Show your work | `## evidence`: commands run, with raw output and counts |
 | **What the verification command actually covers**, read from the task or script definition before the first brief. Nine agents once reported `check-types` clean as evidence their new test files were sound; that task ran the type checker over `src` trees only and had never looked at a test file — run by hand, one test tree held 20 errors. "Exit code is never the check" below generalizes this | `## verification`: the command's scope as the agent understands it, alongside its result |

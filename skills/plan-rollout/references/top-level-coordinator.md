@@ -376,6 +376,10 @@ evidence: clean | <n> discrepancies
 blast_radius: none | sections [...]
 ```
 
+An auditor that returns no verdict hit its turn budget rather than failing. Its audit file is on
+disk and partly filled: read it, treat every `NOT CHECKED` heading as unchecked rather than clean,
+and resume that auditor on the headings it did not reach instead of dispatching a fresh one.
+
 Then this actor **re-verifies exactly one claim with its own hands** — one command — and acts only
 on discrepancies. One check catches an auditor that rubber-stamped; a second is this actor re-reading
 the report it just paid not to read.

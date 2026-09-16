@@ -293,6 +293,8 @@ audit(header):                                                     # references/
                              brief = [header.report_file,                      # the claims
                                       run_dir + "/briefs/" + header.agent + ".md",   # the targets
                                       plan.path, origin]))
+    # no verdict back = turn budget, not failure: read audits/<agent>.md, treat every
+    # NOT CHECKED heading as unchecked, and resume that auditor on the ones it missed
     verify_one_claim_myself(header)                                # never delegate the whole check
     return verdict                                                 # <=10 lines: evidence, blast_radius
 

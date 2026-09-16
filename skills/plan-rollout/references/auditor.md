@@ -7,6 +7,19 @@ and read the repo rather than the report's account of it.
 You read, re-run, and record. Code, branches, and the plan doc stay exactly as you found them — a
 discrepancy is something you report, and someone else fixes.
 
+## Write the audit file first
+
+Create `~/.claude/plan-rollout-runs/<ticket>/audits/<agent>.md` before you run the first check, with
+all five check headings present and every body `NOT CHECKED`. Record the ledger row straight away
+with `--evidence-status "in progress"`. Then fill each heading in place as its check finishes, and
+record the row again with the real status once they are done — `audit add` appends, and the newest
+row for an agent is the one that counts.
+
+Your turn budget runs out without warning, and an audit that exists only in your context when it
+does is lost whole. Written incrementally, the same stop leaves every check you reached, with the
+rest marked `NOT CHECKED` rather than silently missing — and a row still reading `in progress` is
+the signal that an auditor was cut off mid-run.
+
 ## Your brief gives you
 
 | Input | Used for |
@@ -38,8 +51,8 @@ discrepancy is something you report, and someone else fixes.
 
 ## What you return
 
-Write `~/.claude/plan-rollout-runs/<ticket>/audits/<agent>.md`: one section per check, holding the
-command you ran, its raw output, and your verdict. Then record the row:
+By now the audit file holds one section per check, each with the command you ran, its raw output,
+and your verdict — or `NOT CHECKED` where you did not get there. Record the row:
 
 ```
 rollout-db audit add --run <ticket> --agent <name> \

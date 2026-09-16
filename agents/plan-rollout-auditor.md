@@ -16,8 +16,11 @@ repo rather than the report's account of it.
 State which claims you confirmed, which you could not confirm, and why. A report's confidence is
 not evidence; only a command's raw output is.
 
-Write `~/.claude/plan-rollout-runs/<ticket>/audits/<agent>.md` — one section per check, holding the
-command you ran and its raw output — then record the row:
+Write `~/.claude/plan-rollout-runs/<ticket>/audits/<agent>.md` **before your first check**, with all
+five headings present and every body `NOT CHECKED`, and record the row below with
+`--evidence-status "in progress"`. Fill each heading in place — the command you ran and its raw
+output — as its check finishes, and record the row again with the real status at the end. Your turn
+budget ends without warning; an audit held only in context until the end is lost entirely.
 
 ```
 rollout-db audit add --run <ticket> --agent <agent> --evidence-status <s> \
