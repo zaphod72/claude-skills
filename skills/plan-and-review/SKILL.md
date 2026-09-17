@@ -114,7 +114,10 @@ choices open or crosses services; **Sonnet** when it is well-specified feature o
 
 Brief it per `plan-rollout` (`references/brief-contract.md`) — including its evidence demand: **the commands it
 ran and the raw output, alongside every conclusion, and an explicit split between what it verified
-and what it inferred.** A review that returns conclusions alone cannot be checked.
+and what it inferred.** A review that returns conclusions alone cannot be checked. The same
+reference's suppression-artifact rule (full re-read at write time and at every design change,
+scoped headings only) applies to this plan doc once it starts carrying "verified, do not
+re-derive" claims of its own.
 
 Ask it to grade five axes and report per finding:
 

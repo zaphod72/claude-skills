@@ -141,9 +141,19 @@ downstream can catch after the fact:
    rather than ran it, label it an inference and say the agent should check it. On one run a
    coordinator was wrong four times and a sub-agent caught every one — every error was an inference
    written as a verified fact.
+6. **Suppression-class artifacts get a full re-read, not a partial one, at write time and at every
+   design change.** Review recommendations, a "verified, do not re-derive" brief block, a changes
+   inventory a later wave is briefed against — each exists to stop someone downstream from
+   checking something. That function means a stale claim inside one is never caught by anything
+   else further down the pipeline; only re-reading the whole artifact, every time the design under
+   it changes, catches it.
+7. **A heading inside a suppression artifact is scoped, never blanket.** A reader takes the heading
+   as the instruction and will not read a qualifying body underneath it — so a heading that reads
+   as "skip all of X" when the body means "skip X in this one case" gets treated as the broader,
+   wrong claim.
 
 `top-level-coordinator.md` and `second-level-coordinator.md` both point here at the moment they
-describe writing or sending a brief, rather than restating these five checks.
+describe writing or sending a brief, rather than restating these checks.
 
 ## Every brief
 
@@ -191,6 +201,12 @@ describe writing or sending a brief, rather than restating these five checks.
 | From round 2 on, the two convergence-diagnosis questions — do the rounds so far share one missing concept, and was the ticket or plan ever detailed enough for the size of this change — asked of this same dispatch, never a second one, so the cap of three holds | A verdict of OPEN or BLOCKED beside the findings. BLOCKED sets `## status: blocked` and names the decision nobody made in `## blocked_on`, so the routing header carries it; OPEN reports `## status: done` and says plainly in `## review_notes` that these are ordinary bugs converging round by round |
 | The agreed design, not just the ticket — including anything settled after the ticket was written | `## review_notes`: confirmation the design, not just the ticket, was what Spec was graded against |
 | You are read-only in the PR worktree, and you never fix a finding — not even a trivial one; fixes are a separate dispatch, so the same eyes that found a defect don't grade their own fix | Confirmation in `## review_notes`, and the SHA reviewed in `## head_sha` |
+
+Every scope gap and every skip permission stated in `review-recommendations.md` carries the
+command that would falsify it — not every sentence in the document, only these two claim types.
+A scope gap or a skip permission *removes* scrutiny from something a reviewer would otherwise
+check, so an agent trusting it needs a way to check the claim itself; a claim that merely
+directs attention toward something carries no such risk and needs no falsifying command.
 
 ## A fix agent's brief adds
 

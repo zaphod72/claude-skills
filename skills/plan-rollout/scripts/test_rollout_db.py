@@ -201,6 +201,98 @@ class NoteTrapTicketDecisionAuditTests(TempDbTestCase):
         self.assertEqual(rows[0]["path"], "packages/prior-auth/**")
         self.assertEqual(rows[0]["text"], "watch for X")
 
+    def _trap_rows(self):
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute("SELECT rowid, * FROM traps ORDER BY created_at").fetchall()]
+        conn.close()
+        return rows
+
+    def test_trap_resolve_supersedes_by_rowid(self):
+        self._init_run()
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-1", "--repo", "fhir-works",
+             "--path", "packages/prior-auth/**", "--text", "watch for X"],
+            self.db_path,
+        )
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-2", "--repo", "fhir-works",
+             "--path", "packages/prior-auth/**", "--text", "actually watch for Y"],
+            self.db_path,
+        )
+        rows = self._trap_rows()
+        false_rowid = rows[0]["rowid"]
+        correction_rowid = rows[1]["rowid"]
+
+        rc, out, err = run_cli(
+            ["trap", "resolve", "--run", "BOOK-1022", "--rowid", str(false_rowid),
+             "--by-rowid", str(correction_rowid), "--reason", "X was wrong, see Y"],
+            self.db_path,
+        )
+        self.assertEqual(rc, 0, msg=f"stderr={err}")
+        printed = json.loads(out)
+        self.assertEqual(printed["superseded_by"], correction_rowid)
+        self.assertEqual(printed["superseded_reason"], "X was wrong, see Y")
+
+        rows = self._trap_rows()
+        false_row = next(r for r in rows if r["rowid"] == false_rowid)
+        correction_row = next(r for r in rows if r["rowid"] == correction_rowid)
+        self.assertEqual(false_row["superseded_by"], correction_rowid)
+        self.assertEqual(false_row["superseded_reason"], "X was wrong, see Y")
+        self.assertIsNone(correction_row["superseded_by"])
+
+    def test_trap_resolve_rejects_unknown_rowid(self):
+        self._init_run()
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-1", "--repo", "fhir-works",
+             "--path", "packages/prior-auth/**", "--text", "correction row"],
+            self.db_path,
+        )
+        correction_rowid = self._trap_rows()[0]["rowid"]
+        rc, out, err = run_cli(
+            ["trap", "resolve", "--run", "BOOK-1022", "--rowid", "999999",
+             "--by-rowid", str(correction_rowid), "--reason", "nope"],
+            self.db_path,
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertEqual(out, "", msg="a rejected trap resolve must print nothing to stdout")
+        self.assertIn("999999", err)
+
+    def test_trap_resolve_rejects_already_superseded(self):
+        self._init_run()
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-1", "--repo", "fhir-works",
+             "--path", "packages/prior-auth/**", "--text", "watch for X"],
+            self.db_path,
+        )
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-2", "--repo", "fhir-works",
+             "--path", "packages/prior-auth/**", "--text", "actually watch for Y"],
+            self.db_path,
+        )
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-3", "--repo", "fhir-works",
+             "--path", "packages/prior-auth/**", "--text", "actually watch for Z"],
+            self.db_path,
+        )
+        rows = self._trap_rows()
+        false_rowid, correction_rowid, other_rowid = (rows[0]["rowid"], rows[1]["rowid"], rows[2]["rowid"])
+        rc, out, err = run_cli(
+            ["trap", "resolve", "--run", "BOOK-1022", "--rowid", str(false_rowid),
+             "--by-rowid", str(correction_rowid), "--reason", "first resolve"],
+            self.db_path,
+        )
+        self.assertEqual(rc, 0, msg=f"stderr={err}")
+
+        rc, out, err = run_cli(
+            ["trap", "resolve", "--run", "BOOK-1022", "--rowid", str(false_rowid),
+             "--by-rowid", str(other_rowid), "--reason", "second resolve"],
+            self.db_path,
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertEqual(out, "", msg="a rejected trap resolve must print nothing to stdout")
+        self.assertIn(str(false_rowid), err)
+
     def test_ticket_add_inserts_row(self):
         self._init_run()
         rc, out, err = run_cli(
@@ -743,6 +835,36 @@ class DumpCommandTests(TempDbTestCase):
         self.assertIn("coder-1", out)
         self.assertIn("#", out)
 
+    def test_dump_renders_superseded_trap_inline(self):
+        run_cli(["init", "BOOK-1022", "--plan", "/tmp/p.md", "--base", "main", "--sha", "abc"], self.db_path)
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-1", "--repo", "fhir-works",
+             "--path", "a.py", "--text", "watch for X"],
+            self.db_path,
+        )
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-2", "--repo", "fhir-works",
+             "--path", "b.py", "--text", "actually watch for Y"],
+            self.db_path,
+        )
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute("SELECT rowid, * FROM traps ORDER BY created_at").fetchall()]
+        conn.close()
+        false_rowid = rows[0]["rowid"]
+        correction_rowid = rows[1]["rowid"]
+        run_cli(
+            ["trap", "resolve", "--run", "BOOK-1022", "--rowid", str(false_rowid),
+             "--by-rowid", str(correction_rowid), "--reason", "X was wrong, see Y"],
+            self.db_path,
+        )
+        rc, out, err = run_cli(["dump", "BOOK-1022"], self.db_path)
+        self.assertEqual(rc, 0, msg=f"stderr={err}")
+        self.assertIn("SUPERSEDED", out)
+        self.assertIn(f"rowid {correction_rowid}", out)
+        self.assertIn("watch for X", out)
+        self.assertIn("actually watch for Y", out)
+
 
 class TrapsCommandTests(TempDbTestCase):
     def test_traps_filters_by_repo_and_path_glob(self):
@@ -772,6 +894,49 @@ class TrapsCommandTests(TempDbTestCase):
         data = json.loads(out)
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]["text"], "watch A")
+
+    def test_traps_renders_superseded_row_inline_at_its_position(self):
+        run_cli(["init", "BOOK-1022", "--plan", "/tmp/p.md", "--base", "main", "--sha", "abc"], self.db_path)
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-1", "--repo", "fhir-works",
+             "--path", "a.py", "--text", "watch for X"],
+            self.db_path,
+        )
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-2", "--repo", "fhir-works",
+             "--path", "b.py", "--text", "watch for Y"],
+            self.db_path,
+        )
+        run_cli(
+            ["trap", "add", "--run", "BOOK-1022", "--agent", "coder-3", "--repo", "fhir-works",
+             "--path", "c.py", "--text", "actually watch for X'"],
+            self.db_path,
+        )
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute("SELECT rowid, * FROM traps ORDER BY created_at").fetchall()]
+        conn.close()
+        false_rowid = rows[0]["rowid"]
+        correction_rowid = rows[2]["rowid"]
+
+        rc, out, err = run_cli(
+            ["trap", "resolve", "--run", "BOOK-1022", "--rowid", str(false_rowid),
+             "--by-rowid", str(correction_rowid), "--reason", "X was wrong"],
+            self.db_path,
+        )
+        self.assertEqual(rc, 0, msg=f"stderr={err}")
+
+        rc, out, err = run_cli(["traps", "--repo", "fhir-works"], self.db_path)
+        self.assertEqual(rc, 0, msg=f"stderr={err}")
+        data = json.loads(out)
+        self.assertEqual(len(data), 3)
+        # The superseded row stays at its own (first) position, with the
+        # correction marker inline, rather than being appended after the rest.
+        self.assertIn("SUPERSEDED", data[0]["text"])
+        self.assertIn(f"rowid {correction_rowid}", data[0]["text"])
+        self.assertIn("watch for X", data[0]["text"])
+        self.assertEqual(data[1]["text"], "watch for Y")
+        self.assertEqual(data[2]["text"], "actually watch for X'")
 
 
 class HookCheckCommandTests(TempDbTestCase):

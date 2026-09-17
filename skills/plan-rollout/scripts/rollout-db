@@ -182,6 +182,12 @@ def _migrate(conn):
     if "labels" not in cols:
         conn.execute("ALTER TABLE tickets ADD COLUMN labels TEXT")
 
+    trap_cols = {row["name"] for row in conn.execute("PRAGMA table_info(traps)")}
+    if "superseded_by" not in trap_cols:
+        conn.execute("ALTER TABLE traps ADD COLUMN superseded_by INTEGER")
+    if "superseded_reason" not in trap_cols:
+        conn.execute("ALTER TABLE traps ADD COLUMN superseded_reason TEXT")
+
 
 class CliError(Exception):
     """A user-facing error: print str(self) to stderr, exit 1."""
@@ -335,6 +341,40 @@ def cmd_trap_add(conn, args):
     )
     conn.commit()
     return {"run": args.run, "agent": args.agent, "repo": args.repo, "path": args.path, "text": args.text}
+
+
+def cmd_trap_resolve(conn, args):
+    orig = conn.execute(
+        "SELECT rowid, superseded_by FROM traps WHERE run = ? AND rowid = ?",
+        (args.run, args.rowid),
+    ).fetchone()
+    if orig is None:
+        raise CliError(
+            f"trap resolve: no trap found for run '{args.run}' with rowid {args.rowid}"
+        )
+    if orig["superseded_by"] is not None:
+        raise CliError(
+            f"trap resolve: trap rowid {args.rowid} for run '{args.run}' is already superseded"
+        )
+    by_row = conn.execute(
+        "SELECT rowid FROM traps WHERE run = ? AND rowid = ?",
+        (args.run, args.by_rowid),
+    ).fetchone()
+    if by_row is None:
+        raise CliError(
+            f"trap resolve: no trap found for run '{args.run}' with --by-rowid {args.by_rowid}"
+        )
+    conn.execute(
+        "UPDATE traps SET superseded_by = ?, superseded_reason = ? WHERE rowid = ?",
+        (args.by_rowid, args.reason, args.rowid),
+    )
+    conn.commit()
+    return {
+        "run": args.run,
+        "rowid": args.rowid,
+        "superseded_by": args.by_rowid,
+        "superseded_reason": args.reason,
+    }
 
 
 def cmd_ticket_add(conn, args):
@@ -692,7 +732,12 @@ def cmd_dump(conn, args):
     agents = [dict(r) for r in conn.execute("SELECT * FROM agents WHERE run = ? ORDER BY name", (ticket,)).fetchall()]
     units = [dict(r) for r in conn.execute("SELECT * FROM units WHERE run = ? ORDER BY wave, unit", (ticket,)).fetchall()]
     notes = [dict(r) for r in conn.execute("SELECT * FROM notes WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
-    traps = [dict(r) for r in conn.execute("SELECT * FROM traps WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
+    traps = [
+        _render_superseded_text(dict(r))
+        for r in conn.execute(
+            "SELECT rowid, * FROM traps WHERE run = ? ORDER BY created_at", (ticket,)
+        ).fetchall()
+    ]
     tickets = [dict(r) for r in conn.execute("SELECT * FROM tickets WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
     decisions = [dict(r) for r in conn.execute("SELECT * FROM decisions WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
     audits = [dict(r) for r in conn.execute("SELECT * FROM audits WHERE run = ? ORDER BY created_at", (ticket,)).fetchall()]
@@ -719,16 +764,26 @@ def cmd_dump(conn, args):
     return None
 
 
+def _render_superseded_text(row):
+    """Prefix a trap row's text in place when it has been superseded, so the
+    correction renders inline at the original row's position instead of only
+    appearing as a separate row elsewhere in the listing."""
+    if row.get("superseded_by"):
+        reason = row.get("superseded_reason") or ""
+        row["text"] = f"[SUPERSEDED by rowid {row['superseded_by']}: {reason}] {row['text']}"
+    return row
+
+
 def cmd_traps_list(conn, args):
     rows = [
         dict(r)
         for r in conn.execute(
-            "SELECT * FROM traps WHERE repo = ? ORDER BY created_at", (args.repo,)
+            "SELECT rowid, * FROM traps WHERE repo = ? ORDER BY created_at", (args.repo,)
         ).fetchall()
     ]
     if args.path:
         rows = [r for r in rows if fnmatch.fnmatch(r["path"], args.path)]
-    return rows
+    return [_render_superseded_text(r) for r in rows]
 
 
 def cmd_hook_check(conn, args):
@@ -870,6 +925,12 @@ def build_parser():
     p_trap_add.add_argument("--path", required=True)
     p_trap_add.add_argument("--text", default="")
     p_trap_add.set_defaults(func=cmd_trap_add)
+    p_trap_resolve = trap_sub.add_parser("resolve")
+    p_trap_resolve.add_argument("--run", required=True)
+    p_trap_resolve.add_argument("--rowid", type=int, required=True)
+    p_trap_resolve.add_argument("--by-rowid", type=int, required=True)
+    p_trap_resolve.add_argument("--reason", default="")
+    p_trap_resolve.set_defaults(func=cmd_trap_resolve)
 
     p_ticket = sub.add_parser("ticket")
     ticket_sub = p_ticket.add_subparsers(dest="ticket_command", required=True)

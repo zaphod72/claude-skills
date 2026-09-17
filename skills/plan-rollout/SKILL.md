@@ -61,7 +61,10 @@ run from that agent's ledger row, so a dispatcher runs `agent upsert` before its
 **A run resumes from the ledger.** `rollout-db state <ticket>` returns the units, the agents, and
 every decision still open, so a coordinator that was compacted or restarted continues its run instead
 of starting a second one. A question is `decision add`ed when it is asked and `decision resolve`d
-when the human answers, so what comes back open is exactly what still needs one.
+when the human answers, so what comes back open is exactly what still needs one. A trap can
+likewise be retracted with `trap resolve`, linking a correction row to the false one, so
+`traps --repo` and `dump` show the correction inline instead of leaving the false trap standing
+uncorrected.
 
 ## Goals, in priority order
 
