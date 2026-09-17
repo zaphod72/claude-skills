@@ -70,7 +70,7 @@ name lands in `empty_sections`.
 | `## brief_errors` | Bullets: which brief statements turned out wrong, and the correction, each also a `note add --kind brief_error` row | "Report anything here that turns out to be wrong, including anything I have told you" |
 | `## left_undone` | Bullets, each also a `note add --kind left_undone` row | Say what you could not finish |
 | `## skipped` | Bullets, each also a `note add --kind skipped` row | Name any work the plan called for that you skipped |
-| `## red_not_on_base` | `yes` \| `no` — does the same failure reproduce on the base ref; plus a `note add --kind red_not_on_base` row | If checks are red, commit anyway and open the PR as a draft |
+| `## red_not_on_base` | `yes` \| `no` — does the same failure reproduce on the base ref; plus a `note add --kind red_not_on_base` row | If checks are red, commit and report anyway rather than stopping — the PR is a draft either way |
 | `## tickets` | Bullets, key, one line, and its labels, each also a `ticket add` row | Record tracker changes; every ticket carries exactly one triage label at creation — `ready-for-agent` when it is fully specified (file:line evidence, a stated fix, an acceptance check), otherwise `ready-for-human` — plus the labels `common-facts.md` names |
 | `## traps` | Bullets, each also a `trap add --repo <r> --path <p>` row: what bit you, where, and what it costs the next agent | Report any new trap you hit |
 | `## tdd_mode_and_seam` | The mode — red-first, mutation-with-a-control-arm, or the brief's no-`mattpocock-skills:tdd` call still holding — and the seam the tests sit at | Which `mattpocock-skills:tdd` mode this slice gets, and the seam |
@@ -181,7 +181,7 @@ describe writing or sending a brief, rather than restating these checks.
 | Ask what can only be confirmed once the code runs | `## runtime_only_concerns` — per entry, what needs a live run to confirm, and the log line added to catch it, or why none was. `plan-docs` owns the `## Runtime-only checks` table these feed |
 | Say what you could not finish | `## left_undone`, and why, plus a `note add --kind left_undone` row |
 | Name any work the plan called for that you skipped | `## skipped` plus a `note add --kind skipped` row — not a stop |
-| If checks are red, commit anyway and open the PR as a draft, and say whether the same failure reproduces on the base ref | `## red_not_on_base` plus a `note add --kind red_not_on_base` row, and confirmation it opened as a draft — not a stop |
+| If checks are red, commit and report anyway rather than stopping, and say whether the same failure reproduces on the base ref | `## red_not_on_base` plus a `note add --kind red_not_on_base` row — not a stop |
 | If you need a decision you cannot make, call `AWAIT_DECISION()` | `## status: blocked` plus `## blocked_on`: the decision needed and the options you see |
 | Where a known defect stands between you and the task, it is named here as a decision with options — never as a caution to watch for | `## deviations`: which option you chose, and why — a workaround picked under budget pressure stays visible instead of silent |
 | Where your scope is one file, you may report which of your own tests went red. You may never report that a mutation reddens "only" those — cross-file kills are invisible from inside one file | `## evidence`: which of your own tests went red, scoped honestly. An unqualified "only" is a finding the parent checks against the cross-file pass in `review-efficacy-axis.md`, not a result it relays |
@@ -220,6 +220,14 @@ directs attention toward something carries no such risk and needs no falsifying 
 
 A fix agent's report is the standard contract above plus this fix-round summary — not a
 replacement for either.
+
+## A PR-opening or merge agent's brief adds
+
+| Brief says (downward) | Report must carry (upward) |
+|---|---|
+| Open the PR with `--draft` and no `--reviewer` and no `--assignee`, whatever this repo's default-reviewer convention says — `SKILL.md`'s `open_pr()` owns the rule and its one exception, the closing base → trunk PR | `## evidence`: the `gh pr create` command as run, and the PR's `isDraft` and `reviewRequests` read back from `gh pr view` after it opened |
+| To merge an intermediate PR, `gh pr ready` it first — GitHub refuses to merge a draft — then merge; both steps belong to this one dispatch | `## evidence`: both commands and their results |
+| Only a closing base → trunk dispatch opens a PR ready for review with the repo's default reviewers, and that dispatch never merges it | `## evidence`: the reviewers requested, and confirmation no merge was attempted |
 
 ## A resume brief adds
 

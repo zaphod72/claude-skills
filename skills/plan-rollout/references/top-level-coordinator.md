@@ -106,6 +106,12 @@ body; and any escalation PR, left open and explicitly marked not for merging. Th
 history for anyone who wants the raw diff, but the human's own reading is converged agent review, not
 diff-by-diff.
 
+Because that surface is exactly three things, **every inner PR opens as a draft with no reviewers,
+and the closing PR is the only one opened ready for review and given the repo's default reviewers**
+(`SKILL.md`'s `open_pr()`). A repo convention that names default reviewers on every PR is about PRs
+a person is asked to read; asking someone to review an inner PR contradicts the line above it — that
+inner PR is reviewed and merged by agents, and its diff moves under any approval left on it.
+
 ## The loop
 
 Falsify the plan against the live repo before any dispatch — every claim left unchecked is one N
@@ -328,8 +334,10 @@ coordinate_plan(plan):
                             brief = [base, real_trunk, inner_prs_with_tickets_and_round_counts,
                                      notes, tickets, runbook(trunk_dependent),
                                      review_plan_paths]))    # PATHS, never plan content
-             # It assembles the body, calls open_pr(base, into = real_trunk, body = ...), and
-             # returns the URL. Its brief forbids merge_pr: the human merges base -> trunk.
+             # It assembles the body, calls open_pr(base, into = real_trunk, body = ...,
+             # closing = TRUE) — the run's ONLY ready-for-review PR, and the only one that
+             # gets the repo's default reviewers — and returns the URL. Its brief forbids
+             # merge_pr: the human merges base -> trunk.
     present_to_user(pr_url, notes, efficacy_log, review_plan_paths)
     return pr_url
 ```

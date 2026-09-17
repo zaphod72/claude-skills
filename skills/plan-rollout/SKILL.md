@@ -143,6 +143,24 @@ report_upward(header):
 
 cut_branch(from, name):
     git checkout -b name from; git push -u origin name    # pushed at once
+
+open_pr(branch, into, body, closing = FALSE):
+    # gh pr create --base into --head branch --body body --draft
+    # Draft, and NO --reviewer and NO --assignee. Every PR a run opens but the last is an
+    # intermediate PR: an agent reviews it and an agent merges it, and its diff is still
+    # moving through review and fix rounds while it sits there. A repo convention or memory
+    # rule naming default reviewers addresses PRs a person is asked to read, so it does not
+    # reach here -- requesting someone on a PR an agent merges spends their attention on a
+    # diff that changes under them, and their approval lands on a SHA that no longer exists.
+    # Draft also makes "not for merging" mechanical rather than a sentence in the body.
+    # closing = TRUE is the ONE exception: the closing base -> trunk PR of
+    # `top-level-coordinator.md`'s close-out opens ready for review and requests the repo's
+    # default reviewers. That PR is the human's surface, and nothing else in the run is.
+    return pr_url
+
+merge_pr(url, into):
+    gh pr ready url          # GitHub refuses to merge a draft, so the dispatch that merges an
+    gh pr merge url          # intermediate PR readies it first -- both steps, one dispatch
 ```
 
 Call these by name. Their bodies live here and nowhere else.
@@ -232,3 +250,9 @@ remove (building a worktree to run the gates in, and tearing it down, are both) 
 hands; every one above is a dispatch. One actor's dispatch performs each
 level's merges in sequence, so no ordering queue is needed. A merge conflict between two aspect base
 branches is a `needs_human()` stop.
+
+**Every PR but the last opens as a draft with no reviewers.** Only the closing base → trunk PR is
+opened ready for review and given the repo's default reviewers; `open_pr()` above owns the rule and
+the reason, and `merge_pr()` readies a draft before merging it. A repo's own default-reviewer
+convention does not reach an intermediate PR — it is about PRs a person is asked to read, and every
+PR in this table but the last is read and merged by agents.

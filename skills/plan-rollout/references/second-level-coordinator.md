@@ -185,6 +185,11 @@ coordinator opens a PR that has not converged: push `pr_branch`, open the PR int
 comment the last review onto it, and say plainly in that comment that the PR is not for merging — it
 exists for the human to read. Then call `AWAIT_DECISION()`.
 
+It is still an intermediate PR, so `open_pr()`'s rule holds unchanged: **draft, and no reviewers.**
+Draft is what makes "not for merging" mechanical rather than a sentence someone has to notice, and
+the human reaches this PR through `AWAIT_DECISION()` — the top-level coordinator hands them the URL
+— not through a review request that would ask them to approve a branch nobody intends to merge.
+
 ## The BLOCKED gate, from round 2 on
 
 A round cap counts symptoms; it does not ask why they recur. So from round 2 the review brief adds
@@ -413,7 +418,8 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
                 # human can read it. This PR is NOT for merging — say so (the escalation PR)
                 push(pr_branch)                             # dispatched to Sonnet — this actor
                 pr_url = open_pr(pr_branch, into = aspect_base, body = pr.description)  # never
-                                                             # runs a git mutation with its own hands
+                                                             # runs a git mutation with its own hands;
+                                                             # draft, no reviewers — SKILL.md's open_pr
                 comment(pr_url, findings, note = "review limit reached; not for merge")
                 AWAIT_DECISION(pr_url)                     # needs_human() — the escalation PR
 
@@ -446,8 +452,10 @@ coordinate_aspect(aspect, aspect_base, run_dir, efficacy_log):
 
         # converged — now the PR is opened and merged (the cycle's step 5)
         push(pr_branch)                                    # one dispatch to Sonnet performs push,
-        pr_url = open_pr(pr_branch, into = aspect_base, body = pr.description)  # open, and merge —
-        merge_pr(pr_url, into = aspect_base)               # SKILL.md's merge table; never this
+        pr_url = open_pr(pr_branch, into = aspect_base, body = pr.description)  # draft, no
+                                                            # reviewers — SKILL.md's open_pr
+        merge_pr(pr_url, into = aspect_base)               # readies the draft, then merges —
+                                                            # SKILL.md's merge table; never this
                                                             # coordinator's own hands
         cleanup(pr_worktree, pr_branch)                    # same dispatch — clean up after merge, only now
         set_ticket_status(pr.ticket)                       # Testing | Done — the tracker's statuses
