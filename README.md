@@ -19,6 +19,37 @@ ln -s "$(pwd)/output-styles" ~/.claude/output-styles
 ln -s "$(pwd)/agents" ~/.claude/agents
 ```
 
+### Antigravity (CLI & App)
+
+If you also use Google Antigravity, wire this repo into `~/.gemini/config/` so skills and rules are read live:
+
+```bash
+mkdir -p ~/.gemini/config/skills ~/.gemini/config/plugins/bookend-custom/rules
+
+# Symlink individual skill directories into Antigravity
+for skill in "$(pwd)"/skills/*; do
+  [ -d "$skill" ] && ln -sfn "$skill" ~/.gemini/config/skills/$(basename "$skill")
+done
+
+# Package rules as an Antigravity plugin
+cat << 'EOF' > ~/.gemini/config/plugins/bookend-custom/plugin.json
+{
+  "name": "bookend-custom",
+  "version": "1.0.0",
+  "description": "Bookend shared rules and conventions"
+}
+EOF
+
+cat << EOF > ~/.gemini/config/plugins/bookend-custom/rules/AGENTS.md
+# Bookend Custom Rules
+
+@$(pwd)/rules/comment-flags.md
+@$(pwd)/rules/context7.md
+@$(pwd)/rules/python.md
+@$(pwd)/rules/skill-authoring.md
+EOF
+```
+
 This repo depends on skills from the `mattpocock-skills` plugin rather than vendoring
 them: install it with `/plugin install mattpocock-skills@claude-plugins-official`. A
 citation of one of its skills always carries the `mattpocock-skills:` prefix — this repo
