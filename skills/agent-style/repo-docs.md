@@ -81,3 +81,30 @@ Apply this guide when writing or editing documentation in `docs/`, root architec
 - `AGENTS.*.md` files are read by AI coding agents. Every wasted token dilutes context.
 - Keep aspect files compact, factual, and strictly invariant-driven.
 - Focus on: (1) Triggers/scope, (2) Non-negotiable rules, (3) Component/state tables, (4) Safety fences.
+
+### 7. Describe a Data Cutover as a Property of the Rows
+- A guide to data a reader will query (logs, a warehouse table, an archive) may state a cutover, because the reader is choosing a time range across it. Name the date, and the deploy or ticket if that is what dates it.
+- Write what the rows carry, not what the code did. The reader queries rows.
+- **BAD**: `Routed through log_decision as of BOOK-943 — previously a raw log.info regardless of outcome, so this fail event logged at INFO and was invisible.`
+- **GOOD**: `Rows written before the BOOK-943 deploy are a raw log.info at INFO regardless of outcome, so a severity>=WARNING pull misses this fail event.`
+
+### 8. Date Every Measurement and Name the Query Behind It
+- `docs/` is where a measurement relocated out of a code comment lands (see `code-comments.md` rule 8). It has to arrive maintainable.
+- Every number carries the date it was measured and the query, script, or log filter that produced it. Re-run before reusing it in a new argument.
+- Give the measurement a stable section anchor, because a code comment points at it by section.
+- **BAD**:
+  ```markdown
+  Short numeric carrier ids match Stedi payers badly, so the resolver filters them.
+  ```
+- **GOOD**:
+  ```markdown
+  ### 4. Carrier ID Length and Match Quality
+  As of 2026-08-11, across gGastro carriers resolving to exactly one Stedi payer:
+  a 5-character id shares a brand token with Stedi's `DisplayName` 60.9% of the time,
+  a 4-character id 1.4%, a 3-character id 0%. Query: section 4.2.
+  ```
+
+### 9. No Banner Art or Shouty Capitals
+- Use Markdown headings for structure. No ASCII rules, box banners, or ALL-CAPS emphasis.
+- Capitals stay for identifiers that are genuinely uppercase (`QUEUED`, `NULL`, `SELECT`).
+

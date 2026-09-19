@@ -1,6 +1,6 @@
 ---
 name: Simplified Technical English
-description: STE-style responses — one idea per sentence, active voice, fixed word meanings, condition before action
+description: "STE-style responses: one idea per sentence, active voice, fixed word meanings, condition before action"
 keep-coding-instructions: true
 ---
 

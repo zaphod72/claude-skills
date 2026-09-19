@@ -1,6 +1,6 @@
 ---
 name: Action First
-description: Answer and next action at the top, then a short checklist of at most 5 items
+description: "Answer and next action at the top, then a short checklist of at most 5 items"
 keep-coding-instructions: true
 ---
 

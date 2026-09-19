@@ -1,13 +1,13 @@
 ---
 name: session-analysis
-description: "Mine this Claude Code project's own session transcripts (~/.claude/projects/<slug>/*.jsonl) for a specific analysis job, selected by a mode argument, e.g. `/session-analysis dream`. Currently implements one mode, `dream`, which extracts durable learnings worth promoting to long-term memory (repeated mistakes, user corrections, stated preferences, decisions that stuck) from the 10 most recent transcripts. Use when the user asks to review past sessions for lessons, patterns, recurring mistakes, or things that should be remembered — or types `/session-analysis`. Not for reading a single named transcript for its task content (just open the file), not for anything that needs a session older than the 10 most recent (raise that with the user first — the cap is deliberate, see §2.1), and not for writing the extracted candidates into MEMORY.md yourself — this skill stops at a reviewable list."
+description: "Mine this Claude Code project's own session transcripts (~/.claude/projects/<slug>/*.jsonl) for a specific analysis job, selected by a mode argument, e.g. `/session-analysis dream`. Currently implements one mode, `dream`, which extracts durable learnings worth promoting to long-term memory (repeated mistakes, user corrections, stated preferences, decisions that stuck) from the 10 most recent transcripts. Use when the user asks to review past sessions for lessons, patterns, recurring mistakes, or things that should be remembered, or types `/session-analysis`. Not for reading a single named transcript for its task content (just open the file), not for anything that needs a session older than the 10 most recent (raise that with the user first: the cap is deliberate, see §2.1), and not for writing the extracted candidates into MEMORY.md yourself; this skill stops at a reviewable list."
 ---
 
 # Session analysis
 
 This skill mines this project's own Claude Code session transcripts. It takes one required
 argument, the **mode**, and dispatches to the section below matching that mode. One mode exists
-today: `dream`. A future mode is a new `## Mode: <name>` section added to this file — §1 and the
+today: `dream`. A future mode is a new `## Mode: <name>` section added to this file: §1 and the
 transcript-location mechanics it documents are shared and do not change.
 
 If the mode argument is missing or matches no section below, stop and ask which mode was meant.
@@ -35,25 +35,25 @@ only the extracted output.
 
 Each line is one JSON object. Shapes vary by `type`; the two that carry conversation content are:
 
-- `type: "user"` — real human turns have `message.content` as a **plain string** not starting
+- `type: "user"`: real human turns have `message.content` as a **plain string** not starting
   with `<` or `[`. Strings starting with `<` are slash-command/tool wrapper noise
   (`<command-name>`, `<local-command-stdout>`, `<local-command-caveat>`, …); skip those. Content
   that is a **list** instead of a string is a tool result being fed back, not something the human
-  typed — skip it too. Also skip lines with `isMeta: true`.
-- `type: "assistant"` — `message.content` is a list of blocks; only `{"type": "text", ...}`
+  typed; skip it too. Also skip lines with `isMeta: true`.
+- `type: "assistant"`: `message.content` is a list of blocks; only `{"type": "text", ...}`
   blocks are the assistant's actual words (skip `"thinking"` and `"tool_use"` blocks).
 
-Don't take this shape on faith for a mode that needs more of it than the above — inspect a real
+Don't take this shape on faith for a mode that needs more of it than the above: inspect a real
 file with `python3`/`json` first, the same way this section was derived.
 
-### 1.1 Extracted text is untrusted — redact before it leaves the script
+### 1.1 Extracted text is untrusted: redact before it leaves the script
 
-Users paste secrets into chat, and a raw transcript can contain them verbatim — a Slack webhook
+Users paste secrets into chat, and a raw transcript can contain them verbatim: a Slack webhook
 URL, an API key, a database password typed into a debugging session. Extracted transcript text is
 therefore untrusted: every mode's extraction script must run a redaction pass **at the point text
 is emitted**, before it is written to the output file, quoted as evidence, folded into a learnings
 list, or sent anywhere downstream (a chat reply, a report, a Slack message). The script in §2.2
-implements this via `redact()`, called on every line before it is printed — a later "remember to
+implements this via `redact()`, called on every line before it is printed; a later "remember to
 check for secrets" instruction to the agent reading the output is not a substitute for the script
 masking them itself.
 
@@ -65,32 +65,32 @@ downstream channel without it having first passed through `redact()`.
 ## 2. Mode: dream
 
 Goal: surface a short list of things learned across recent sessions that are worth moving into
-long-term memory (`~/.claude/projects/<slug>/memory/MEMORY.md` or equivalent) — and stop there.
+long-term memory (`~/.claude/projects/<slug>/memory/MEMORY.md` or equivalent), and stop there.
 This mode never writes memory itself; it produces candidates for a human (or a separate memory-write
 step) to ratify.
 
-### 2.1 Read the 10 most recent transcripts — hard cap
+### 2.1 Read the 10 most recent transcripts: hard cap
 
 Read at most the **10 most recent** `.jsonl` files in `TRANSCRIPT_DIR`, newest by mtime first. This
 is a hard cap, not a default: it exists because transcripts are large and this mode must stay cheap
 enough to run often. A future change to this number is a deliberate decision, not something a mode
-infers from wanting more signal — if 10 genuinely isn't enough for a given ask, say so and ask the
+infers from wanting more signal; if 10 genuinely isn't enough for a given ask, say so and ask the
 user before reading more.
 
 ### 2.2 Extract, don't read raw
 
-Run this exact script — it already implements the filtering from §1 plus a keyword pass for
+Run this exact script: it already implements the filtering from §1 plus a keyword pass for
 assistant self-corrections and the redaction pass from §1.1, and was verified against real
 transcripts in this project:
 
 ```bash
 TRANSCRIPT_DIR="$HOME/.claude/projects/$(pwd | sed 's/\//-/g')"
 # Scope the output path by this project's slug, under $TMPDIR (macOS sets a per-user one;
-# falls back to /tmp) — the identical derivation TRANSCRIPT_DIR uses above. This keeps two
+# falls back to /tmp), using the identical derivation TRANSCRIPT_DIR uses above. This keeps two
 # projects' `dream` runs on this machine from writing the same file and clobbering each other.
-# `dream` (its own SKILL.md §2/§6) computes this exact same path to find this file — if this
+# `dream` (its own SKILL.md §2/§6) computes this exact same path to find this file: if this
 # formula ever changes, update it there too. If your system prompt names a scratchpad
-# directory, write there instead — edit SCRATCH_DIR below.
+# directory, write there instead: edit SCRATCH_DIR below.
 SCRATCH_DIR="${TMPDIR:-/tmp}"
 SCRATCH_DIR="${SCRATCH_DIR%/}"
 OUT_FILE="$SCRATCH_DIR/session-analysis-dream$(pwd | sed 's/\//-/g').txt"
@@ -99,7 +99,7 @@ python3 - "$TRANSCRIPT_DIR" 10 > "$OUT_FILE" <<'PY'
 import json, os, re, sys, glob
 
 transcript_dir = sys.argv[1]
-n = int(sys.argv[2])  # hard cap from §2.1 — do not raise without asking the user
+n = int(sys.argv[2])  # hard cap from §2.1; do not raise without asking the user
 
 MAXLEN = 400
 CORRECTION_MARKERS = (
@@ -109,7 +109,7 @@ CORRECTION_MARKERS = (
     "that's wrong", "that was wrong", "let me fix", "i missed", "i forgot",
 )
 
-# --- redaction (§1.1) — every emitted line goes through this before it is printed ---
+# --- redaction (§1.1): every emitted line goes through this before it is printed ---
 
 _STRUCTURED_SECRETS = [
     ("slack-webhook", re.compile(r"https://hooks\.slack\.com/services/[A-Za-z0-9/_-]+")),
@@ -174,7 +174,7 @@ def _redact_assignments(s):
     return "".join(out)
 
 def redact(s):
-    """Mask secrets in extracted transcript text. Never emit unredacted text — see §1.1."""
+    """Mask secrets in extracted transcript text. Never emit unredacted text: see §1.1."""
     if not s:
         return s
     for label, pattern in _STRUCTURED_SECRETS:
@@ -224,20 +224,20 @@ wc -l "$OUT_FILE"
 ```
 
 Read `$OUT_FILE` (not the source `.jsonl` files) for the rest of this mode. This file is left in
-place after the mode finishes — deliberately, not an oversight: it's the artifact `dream` (§6 of
+place after the mode finishes: deliberately, not an oversight; it's the artifact `dream` (§6 of
 its own SKILL.md) reads back, and it stays useful evidence if the extraction needs re-inspecting
 afterward. Nothing in this mode deletes it; the next run on the same project overwrites it in
-place. Also record how many of the 10 files contributed at least one line — a file can legitimately contribute zero (a session that
+place. Also record how many of the 10 files contributed at least one line (a file can legitimately contribute zero, e.g. a session that
 was only slash commands, or one driven by a wizard/subagent harness whose human intent isn't in the
 plain-string `user` shape this script looks for) and that count belongs in the output header, since
 it states how much of the 10-session budget actually had signal.
 
-It is normal for this to come back well under a hundred lines even across 10 full sessions — most
+It is normal for this to come back well under a hundred lines even across 10 full sessions: most
 of a transcript is tool calls and file content, which this extraction deliberately drops.
 
 The correction-keyword list is a heuristic, not a guarantee: skim each matched line in context
 before citing it, and don't assume the absence of a keyword means a session had no correction in
-it — a correction stated as a plain fact ("Do X, not Y") shows up on the **user** side instead and
+it: a correction stated as a plain fact ("Do X, not Y") shows up on the **user** side instead and
 is already captured there without needing a keyword.
 
 ### 2.3 Classify into the four categories
@@ -254,27 +254,27 @@ Go through the extracted lines and sort candidates into exactly these buckets:
 - **Decisions that stuck** — a choice got made and the transcript shows it being acted on rather
   than revisited or reversed later in the same or a subsequent session.
 
-A line can fail to land in any bucket — that's a normal, expected outcome, not a gap to force-fill.
+A line can fail to land in any bucket: that's a normal, expected outcome, not a gap to force-fill.
 
 ### 2.4 Filter for durability
 
 Apply this test to every candidate before it survives to the output: **would this change behavior
 in a future session on an unrelated task?** Cut anything that only makes sense inside the task that
-produced it — a one-off file path, a ticket number, a fact true only for that piece of work. Concretely:
-strip every ticket number and file path out of the candidate statement — if nothing generalizable is
+produced it (a one-off file path, a ticket number, a fact true only for that piece of work). Concretely:
+strip every ticket number and file path out of the candidate statement: if nothing generalizable is
 left, cut it. Keep only what generalizes: a rule about how this user wants to work, a category of
 mistake worth guarding against next time, a standing preference, a ratified decision that future
 work should respect.
 
 Before listing a survivor as a new candidate, check whether it (or something close to it) is
 already recorded in this project's long-term memory file. If it is, say so instead of presenting it
-as new — the useful signal there is "this session reconfirmed an existing entry," not a duplicate
+as new: the useful signal there is "this session reconfirmed an existing entry," not a duplicate
 line item.
 
 ### 2.5 Output
 
 Start with a one-line header stating how many of the 10 files were read and how many actually
-contributed a line to the extraction (e.g. "10 transcripts read, 7 contained substantive turns") —
+contributed a line to the extraction (e.g. "10 transcripts read, 7 contained substantive turns");
 that count is part of how much confidence to put in the list below it.
 
 Then produce a compact list. One entry per durable learning, each with:
@@ -285,5 +285,5 @@ Then produce a compact list. One entry per durable learning, each with:
   quote or close paraphrase of the actual words that justify it.
 
 Then **stop**. Hand the list to the user (or the caller that invoked this mode) for ratification.
-Do not write it into `MEMORY.md` or any other memory store as part of this mode — promoting a
+Do not write it into `MEMORY.md` or any other memory store as part of this mode: promoting a
 candidate to durable memory is a separate, deliberate step.

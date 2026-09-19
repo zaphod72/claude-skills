@@ -18,8 +18,8 @@ is one independently deliverable slice of the plan.
 Every actor's reference file, `references/auditor.md`, `scripts/rollout-db`, and all four
 `agents/plan-rollout-*.md` definitions are loaded live through `~/.claude/skills` and
 `~/.claude/agents`, symlinks into this repo's working tree. This skill only functions when the
-working tree checked out at those symlink targets holds this content — merged to trunk, or this
-branch checked out directly. Switching branches in that checkout while a plan-rollout run is live
+working tree checked out at those symlink targets holds this content (merged to trunk, or this
+branch checked out directly). Switching branches in that checkout while a plan-rollout run is live
 breaks every running instance: ledger writes and dispatch fail outright, and a mismatched
 `brief-contract.md` can silently reappear and reject an agent's report with a "missing required
 heading(s)" error that looks like the agent's mistake rather than a checkout problem.
@@ -40,20 +40,20 @@ preloads the one file its actor reads, so a brief names that file and no other.
 
 ## Where a run keeps its state
 
-Two homes, both derived from the ticket, so any actor — including a restarted one — resolves them
+Two homes, both derived from the ticket, so any actor (including a restarted one) resolves them
 without being told.
 
 - `~/.claude/plan-rollout-runs/<ticket>/` holds this run's prose: briefs, reports, audits, review
   recommendations, per-PR review files, the changes inventory.
 - `~/.claude/plan-rollout-runs/rollout.db` is the ledger, shared by every run. Fixed-field,
-  multi-writer data lives there — the partition, agents, report headers, notes, traps, tickets,
-  decisions, audits — because `Edit` and `Write` rewrite whole files and concurrent appends clobber
+  multi-writer data lives there (the partition, agents, report headers, notes, traps, tickets,
+  decisions, audits) because `Edit` and `Write` rewrite whole files and concurrent appends clobber
   each other silently. `~/.claude/skills/plan-rollout/scripts/rollout-db` is the only way in.
 
 **Every report is two tiers.** The dispatched agent writes its full report to
 `<run dir>/reports/<agent>.md` under fixed `##` headings, then runs `rollout-db report <name>`,
-which parses the file, writes the `headers` row, and prints a **routing header** — status, branch,
-SHAs, the counts, `empty_sections` — at most 30 lines. The header is the only thing that returns
+which parses the file, writes the `headers` row, and prints a **routing header** (status, branch,
+SHAs, the counts, `empty_sections`) of at most 30 lines. The header is the only thing that returns
 inline, and the parent opens the report file only when a count sends it there. `report` resolves the
 run from that agent's ledger row, so a dispatcher runs `agent upsert` before its child can report.
 `references/brief-contract.md` owns the headings, the fields, and the pairing rule between them.
@@ -70,13 +70,13 @@ uncorrected.
 
 Settle every judgment call against this list, top down.
 
-1. **Accurate code and simple reviews** — small PRs, and `mattpocock-skills:tdd`.
+1. **Accurate code and simple reviews**: small PRs, and `mattpocock-skills:tdd`.
 2. **A clear testable seam per PR.** This partitions the work, not just decorates it.
 3. **Small context windows,** by splitting work across sub-agents.
 4. **`mattpocock-skills:tdd` plus at most three reviews.** Both earn their place; keep both.
 5. **Complete the plan.** Related issues get fixed, not parked in tickets.
-6. **Review each thing once.** The run artifacts — the review recommendations and the per-PR
-   review file — exist to spend review effort once.
+6. **Review each thing once.** The run artifacts (the review recommendations and the per-PR
+   review file) exist to spend review effort once.
 
 ## Predicates and primitives
 
@@ -123,10 +123,10 @@ AWAIT_DECISION(reason, options):
         # A sub-agent has no user. End this turn with a blocked report; the parent
         # decides and resumes THIS agent with the answer (SendMessage). Verified
         # 2026-09-07: a nested parent CAN resume an already-finished child, and the
-        # child keeps its context — so resume, rather than re-dispatching, is the
+        # child keeps its context; resume, rather than re-dispatching, is the
         # path. SendMessage may be deferred in a sub-agent; load it via ToolSearch.
         # Fallback if a resume ever fails: re-dispatch fresh with the decision in
-        # the brief — same control flow, but the child's worktree state and
+        # the brief (same control flow), but the child's worktree state and
         # everything it already read are lost, so it re-derives them.
         write_report_file(my_report_path)      # `## status: blocked`, and `## blocked_on`
                                                 # naming the decision and the options you see
@@ -137,7 +137,7 @@ report_upward(header):
     # The one way a dispatched agent ends its turn, blocked or done. Write the full
     # report to <run dir>/reports/<name>.md with every fixed `##` heading present, run
     # `rollout-db report <name> --file <path>`, and return ONLY the routing header it
-    # printed — never the report text, never a summary alongside it.
+    # printed, never the report text, never a summary alongside it.
     # brief-contract.md owns the headings and the header's fields.
     return header
 
@@ -180,7 +180,7 @@ either test, so a public rename cannot pass as cosmetic.
 case to an existing test for behavior that is already correct.
 
 A *missing* test that reveals a behavior gap is a real finding wearing a test's clothes. Shared test
-infrastructure is never trivial in either direction — a test turning **green** there is the more
+infrastructure is never trivial in either direction: a test turning **green** there is the more
 dangerous one, and neither direction shows in the diff
 (`claims-and-scope-discipline` §11 for the baseline procedure).
 
@@ -192,11 +192,11 @@ Unconditional, and live only during a run.
 
 Run tests as often as you like while developing. This governs the last run only.
 
-Before what might be the final commit, run every file-modifying step first — formatters, import
-ordering, lint `--fix`, type fixes — **then** the final test run. Formatting after a test run forces
+Before what might be the final commit, run every file-modifying step first (formatters, import
+ordering, lint `--fix`, type fixes), **then** the final test run. Formatting after a test run forces
 that test run to be repeated.
 
-**Select tests by grepping the changed symbols across the whole test tree**, not by filename —
+**Select tests by grepping the changed symbols across the whole test tree**, not by filename;
 `references/brief-contract.md`, "Select tests by symbol, not by filename", owns why and the count
 that pairs with it. Run the full suite only when it is genuinely necessary; inside a stack that
 selection is the whole gate, since a repo's `pull_request: branches:` list may not name an aspect
@@ -223,7 +223,7 @@ own **slice branch** cut off the PR branch, and the coordinator merges them in.
 
 ### Clean up after merge
 
-Delete the worktree and the branch once the PR merges — the review and fix rounds need them until
+Delete the worktree and the branch once the PR merges; the review and fix rounds need them until
 then.
 
 ## Branches and merges
@@ -245,14 +245,13 @@ fetch it.
 | Aspect base → base branch | A sub-agent dispatched by the top-level coordinator |
 | Base branch → trunk | **The human.** The top-level coordinator opens this PR and leaves it |
 
-A coordinator never performs a git mutation — merge, push, branch create or delete, worktree add or
-remove (building a worktree to run the gates in, and tearing it down, are both) — with its own
-hands; every one above is a dispatch. One actor's dispatch performs each
-level's merges in sequence, so no ordering queue is needed. A merge conflict between two aspect base
-branches is a `needs_human()` stop.
+A coordinator never performs a git mutation (merge, push, branch create or delete, worktree add or
+remove): building a worktree to run the gates in, and tearing it down, are both; every one above is
+a dispatch. One actor's dispatch performs each level's merges in sequence, so no ordering queue is
+needed. A merge conflict between two aspect base branches is a `needs_human()` stop.
 
 **Every PR but the last opens as a draft with no reviewers.** Only the closing base → trunk PR is
 opened ready for review and given the repo's default reviewers; `open_pr()` above owns the rule and
 the reason, and `merge_pr()` readies a draft before merging it. A repo's own default-reviewer
-convention does not reach an intermediate PR — it is about PRs a person is asked to read, and every
+convention does not reach an intermediate PR: it is about PRs a person is asked to read, and every
 PR in this table but the last is read and merged by agents.

@@ -1,6 +1,6 @@
 ---
 name: Direct Human Voice
-description: Direct human voice with zero AI filler, specific nouns and verbs, opinions when a recommendation is needed
+description: "Direct human voice with zero AI filler, specific nouns and verbs, opinions when a recommendation is needed"
 keep-coding-instructions: true
 ---
 

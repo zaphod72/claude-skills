@@ -9,7 +9,7 @@ directories (a `SKILL.md` each, some with a `references/` folder disclosed from 
 
 `~/.claude/skills`, `~/.claude/rules`, `~/.claude/output-styles`, and `~/.claude/agents`
 are symlinks straight into this repo's `skills/`, `rules/`, `output-styles/`, and
-`agents/` directories — nothing is copied anywhere. Edit a file here and every session
+`agents/` directories: nothing is copied anywhere. Edit a file here and every session
 on the machine reads the change immediately; there is no sync step.
 
 ```
@@ -52,7 +52,7 @@ EOF
 
 This repo depends on skills from the `mattpocock-skills` plugin rather than vendoring
 them: install it with `/plugin install mattpocock-skills@claude-plugins-official`. A
-citation of one of its skills always carries the `mattpocock-skills:` prefix — this repo
+citation of one of its skills always carries the `mattpocock-skills:` prefix. This repo
 cites `mattpocock-skills:tdd`, `mattpocock-skills:writing-for-agents`,
 `mattpocock-skills:code-review`, `mattpocock-skills:research`, and
 `mattpocock-skills:grilling` from it. Citations here were written against the plugin
@@ -67,11 +67,11 @@ trusting the citation.
 - **plan-rollout** — the front door for "make this happen". Takes a ticket or a plan doc
   and drives it to merged PRs: falsifies the plan against the live repo, cuts a base
   branch, partitions the work into PRs and into *operational units* (a deploy, an IAM
-  grant, a migration — things no agent can perform), then runs each slice of the work as a
+  grant, a migration: things no agent can perform), then runs each slice of the work as a
   build → review → fix → merge loop. Fires when a ticket or plan needs implementing, when
   work needs partitioning, or when any agent is about to be dispatched to edit code.
 
-  It is built from **four actors**, and each reads only its own reference file — a
+  It is built from **four actors**, and each reads only its own reference file; a
   coordinator never loads another actor's loop:
 
   | Actor | Reads | Owns |
@@ -82,8 +82,8 @@ trusting the citation.
   | Auditor (one per report) | `references/auditor.md` | Re-running a report's evidence against the repo, and the blast-radius answer |
 
   The top-level coordinator is the session you are in; every other role is dispatched
-  from an agent definition in `agents/` — `plan-rollout-slc`, `plan-rollout-coder`,
-  `plan-rollout-reviewer`, `plan-rollout-auditor` — each preloading the reference file
+  from an agent definition in `agents/` (`plan-rollout-slc`, `plan-rollout-coder`,
+  `plan-rollout-reviewer`, `plan-rollout-auditor`), each preloading the reference file
   that actor reads. A run keeps its prose in `~/.claude/plan-rollout-runs/<ticket>/`
   and its fixed-field, multi-writer rows in one SQLite ledger beside it, so a
   coordinator that is compacted or restarted resumes instead of starting over.
@@ -95,7 +95,7 @@ trusting the citation.
 
   The design point worth knowing before you read it: **continuation is the invariant.** A
   finished PR is a loop iteration, not a checkpoint. The skill carries one predicate,
-  `needs_human()`, that is the complete list of reasons the run may stop — six conditions,
+  `needs_human()`, that is the complete list of reasons the run may stop: six conditions,
   and "a PR is done" is deliberately not one of them.
 
 - **git-worktree-topology** — the git mechanics underneath a multi-agent run: branch
@@ -106,7 +106,7 @@ trusting the citation.
 ### Plans, claims, and write-ups
 
 - **plan-and-review** — produces the plan `plan-rollout` can be trusted with: pairs it
-  with a ticket, decides whether the work needs a plan at all (many tickets don't — it
+  with a ticket, decides whether the work needs a plan at all (many tickets don't: it
   says so and hands off), checks every claim before drafting, reviews the draft with a
   subagent, and resolves every open question. Fires when a ticket has no plan, a plan has
   no ticket, or a draft still carries open questions.
@@ -140,12 +140,12 @@ trusting the citation.
   standards with no knowledge of the work at all. Agreement between the passes is signal and
   so is divergence, which is why neither author may see the other's source. The isolation has
   to survive the pass, not just the plan: fresh sub-agents only, never a fork, and the
-  dispatching session hands over *paths* rather than content — which is what disqualifies it
+  dispatching session hands over *paths* rather than content, which is what disqualifies it
   from synthesising later. Each plan is written for a Claude agent to execute rather than a
   person to read, so it carries completion criteria a reviewer can fail plus its own scope and
-  exclusion list — a later session running the pass may never see the brief that produced the
+  exclusion list: a later session running the pass may never see the brief that produced the
   plan. Writing the plans and running the passes are separate steps. Exits
-  immediately if the repo has no standards docs — with one source there is no second scope.
+  immediately if the repo has no standards docs: with one source there is no second scope.
   Fires at a `plan-rollout` close-out, or when a review needs more than one pass.
 
 ### Memory maintenance
@@ -160,7 +160,7 @@ trusting the citation.
   learnings). Stops at a reviewable list; it never writes memory itself.
 - **improve-memory** — takes a learnings list and drafts a proposed cleanup of memory and
   the `CLAUDE.md` files: merges duplicates, resolves contradictions, fixes broken index
-  and wiki-link pointers. Writing the overview is the whole job — applying it is a
+  and wiki-link pointers. Writing the overview is the whole job; applying it is a
   separate, deliberate step.
 - **send-results** — posts a Slack message that stands alone as a durable record: the
   caller's full content plus a file's absolute path. Deliberately generic; any automation
@@ -168,7 +168,7 @@ trusting the citation.
 
 ### Writing
 
-- **agent-style** — 22 literature-backed prose rules for engineering docs a human
+- **agent-style** — 27 literature-backed prose rules for engineering docs a human
   reads later (READMEs, comments, commit/PR/issue text, changelogs, runbooks,
   postmortems, explainers for a non-technical reader). Cross-references the
   `plain-english` output style rather than restating it; the two divide by whether
@@ -192,21 +192,21 @@ trusting the citation.
 - **context7.md** — the four-step Context7 procedure (resolve an ID, pick the best match,
   query one concept at a time, answer from the docs). It defers the *when-to-trigger*
   question to the Context7 plugin's own server instructions, so it is a procedure doc
-  rather than a trigger — and it overlaps in content with the `context7-mcp` skill, which
+  rather than a trigger, and it overlaps in content with the `context7-mcp` skill, which
   does carry its own triggers.
 - **python.md** — `uv`/`poe` conventions for this org's Python projects (never a bare
   `python`/`pip`) plus a short testing philosophy. Carries `paths: ["**/*.py"]`
   frontmatter, so unlike the other rules it auto-applies whenever a `.py` file is in play.
 - **skill-authoring.md** — two traps in writing skills for this machine. A bare `$0`–`$9`
   inside a fenced code block in a `SKILL.md` gets silently rewritten with a word from the
-  caller's argument string when the skill is invoked with `args` — the file on disk stays
+  caller's argument string when the skill is invoked with `args`: the file on disk stays
   correct, so review never surfaces it. And skill snippets run against BSD tools, so
   `head -n -N` and `date -d` do not work. Carries `paths: ["skills/**/*.md"]`.
 
 ## Call graph
 
-Built by matching real invocation forms — a backticked skill name, a `/name`, or "the X
-skill" — across every `.md` file in each skill's directory, excluding frontmatter
+Built by matching real invocation forms (a backticked skill name, a `/name`, or "the X
+skill") across every `.md` file in each skill's directory, excluding frontmatter
 `description:` lines (those carry routing exclusions like "Not … (other-skill)", which are
 deliberately not calls).
 
@@ -237,21 +237,11 @@ Two shapes of edge show up, and they mean different things to a reader:
 
 Notes on edges that needed a judgment call rather than a mechanical match:
 
-- **`plan-rollout` absorbed four skills, so its old citation edges became internal.** It
-  used to cite `parallel-agent-orchestration`, `ticket-delivery-loop`, `pr-fix-review` and
-  `stacked-pr-review` by section number. They did not all land the same way:
-  `parallel-agent-orchestration` and `ticket-delivery-loop` became reference files,
-  `pr-fix-review` became two questions a round-2 review brief asks (so the three-round cap
-  still counts one dispatch per round), and only `stacked-pr-review`'s declared-gap harvest
-  survived at all. Every external skill that cited them now points at a reference file path
-  instead. Citing a numbered section of another skill turned out to go stale constantly —
-  the convention now is to cite the skill and its reference file, never a section number.
-  That applies to `plan-rollout` itself: it no longer has numbered steps, so nothing cites
-  it by step.
+- **`plan-rollout` citation convention.** External skills cite `plan-rollout` and its reference files by file path rather than section number. Citing reference file paths keeps citations stable as skill content evolves.
 - **One edge is easy to exclude by mistake.** `session-analysis` uses the bare word `dream`
-  as a *mode argument*, which is not a call — but it separately cites the `dream` skill by
-  name, for a lock path the two compute identically. Excluding the skill on the strength of
-  the mode argument would have hidden a real keep-in-sync dependency, so the row carries it.
+  as a *mode argument*, which is not a call; it separately cites the `dream` skill by
+  name for a lock path both compute identically. Excluding the skill on the strength of
+  the mode argument would hide a real keep-in-sync dependency, so the row carries it.
 - **`claims-and-scope-discipline` ↔ `root-cause-fix` is a hand-off, not a cycle.** Each end
   calls the other and each says so: classify and scope every finding in the first, then
   call the second to group them by cause.
@@ -259,28 +249,17 @@ Notes on edges that needed a judgment call rather than a mechanical match:
   one direction fires per run.** `plan-rollout` calls `plan-and-review` and then continues
   on its own; `plan-and-review` therefore *returns* when it was entered that way, and calls
   `plan-rollout` only when it was invoked directly. Both state the rule at their own seam,
-  because a description cannot carry which end the run started from — without it the pair
+  because a description cannot carry which end the run started from: without it the pair
   would loop.
 - **Both also delegate out to `plan-rollout` when the work turns out to need no plan at
   all.** That exit is the common case for a single-PR ticket. `plan-rollout` handles it as
-  a one-PR, one-aspect partition — a single-aspect plan still gets a second-level
+  a one-PR, one-aspect partition: a single-aspect plan still gets a second-level
   coordinator, so the hand-off has a real target rather than falling through.
-- **The `plan-docs` edges from `plan-rollout` and `plan-and-review` are genuinely both**
-  delegation and citation — each says "read it now" and also cites it for supporting
-  detail. Both columns carry the edge rather than forcing one.
-- **`review` now points at the plugin, not the built-in.** It used to invoke the
-  unprefixed `code-review`, which on this machine was a gitignored symlink to a local copy
-  that had drifted from the plugin of the same name. Two versions of one skill under one
-  name was the defect, and it wasn't unique to `code-review`: of the fifteen symlinked
-  skills under `skills/`, seven were checked against their plugin counterpart and every
-  one had a different body, confirmed by differing line counts (`tdd` 16, `code-review`
-  54, `research` 2, `codebase-design` 26, `diagnosing-bugs` 58,
-  `resolving-merge-conflicts` 2, `writing-for-agents` 50). The fix is repo-wide: the
-  symlinks are gone, and every citation of one of those fifteen names now points at the
-  `mattpocock-skills:`-prefixed plugin skill instead. Removing them also un-shadowed
-  Claude Code's own built-in `code-review`, so the unprefixed name resolves to that
-  built-in now — a different tool with a different output shape. Reach for the two-axis
-  review by its full name, `mattpocock-skills:code-review`.
+- **The `plan-docs` edges from `plan-rollout` and `plan-and-review` are genuinely both delegation and citation.**
+  Each says "read it now" and also cites it for supporting detail. Both columns carry the edge rather than forcing one.
+- **`review` delegates to `mattpocock-skills:code-review`.** Reach for the two-axis
+  review by its full name, `mattpocock-skills:code-review`. The unprefixed `code-review`
+  name resolves to Claude Code's built-in tool.
 
 ## Advisor
 

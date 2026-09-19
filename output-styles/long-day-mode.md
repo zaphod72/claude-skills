@@ -1,6 +1,6 @@
 ---
 name: Long Day Mode
-description: Small words and short sentences: what you did, whether it worked, what to do now
+description: "Small words and short sentences: what you did, whether it worked, what to do now"
 keep-coding-instructions: true
 ---
 

@@ -9,11 +9,11 @@ surfaces.
 
 ## How to apply
 
-- `BUGBUG` — a real defect that exists in the code right now.
-- `TODO` — deferred or interim work that isn't yet broken.
+- `BUGBUG`: a real defect that exists in the code right now.
+- `TODO`: deferred or interim work that isn't yet broken.
 - If the repo already uses a scoped form (e.g. `TODO(vendor-detection):`), follow it when the note
   has a natural scope tag.
-- Keep the explanatory prose that follows the flag — only the flag word changes.
+- Keep the explanatory prose that follows the flag: only the flag word changes.
 - Applies to prose too: when docs cross-reference a comment by its flag name, keep the two in sync.
 - Don't retro-fix pre-existing invented flags as a drive-by; that's a separate cleanup the user
   has to ask for.

@@ -5,7 +5,7 @@ paths: ["**/*.py"]
 ## Python projects: always `uv`
 
 - Every Python project here uses **`uv`** as the package manager, so a `pyproject.toml` is always
-  present — read it before guessing at tooling.
+  present; read it before guessing at tooling.
 - **Run everything through `uv run`.** It auto-loads the project's `.venv`, so there is never a
   reason to activate the venv, or to invoke `.venv/bin/python`, a bare `python3`, or `pip` directly.
   - Python: `uv run python -c "..."`

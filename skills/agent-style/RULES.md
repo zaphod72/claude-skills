@@ -1,13 +1,13 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-# The Elements of Agent Style — Rules
+# The Elements of Agent Style: Rules
 
 Full detail behind [`SKILL.md`](SKILL.md)'s rule index: source, one directive, two BAD→GOOD examples (one engineering-doc context, one non-technical-reader context, where the rule benefits from showing both), and one line of rationale. Every rule shares the same scope (engineering docs, comments, commit/PR/issue text, changelogs, runbooks, postmortems, explainers for non-technical readers) unless noted otherwise, and the same severity scale:
 
-- **critical** — reader cannot understand or trust the prose if violated.
-- **high** — externally visible AI-tell, or a recurring failure that breaks skim-reading.
-- **medium** — local readability cost, felt but not a trust issue.
-- **low** — polish or preference.
+- **critical**: reader cannot understand or trust the prose if violated.
+- **high**: externally visible AI-tell, or a recurring failure that breaks skim-reading.
+- **medium**: local readability cost, felt but not a trust issue.
+- **low**: polish or preference.
 
 > *"Break any of these rules sooner than say anything outright barbarous."* — George Orwell, "Politics and the English Language" (1946), Rule 6.
 
@@ -23,24 +23,24 @@ Full detail behind [`SKILL.md`](SKILL.md)'s rule index: source, one directive, t
 - BAD (for a non-technical reader): `We added idempotency keys to the payment endpoint to prevent duplicate charges from retries.`
   GOOD (for a non-technical reader): `If a customer's payment request times out and their app retries it, we now recognize the retry and charge them once, not twice.`
 
-An LLM writes at the register of its training corpus by default, with no signal for whether the actual reader shares that background — a gap invisible to the writer and glaring to the reader.
+An LLM writes at the register of its training corpus by default, with no signal for whether the actual reader shares that background, a gap invisible to the writer and glaring to the reader.
 
 ### RULE-02: Avoid Passive Voice When the Agent Matters (high)
 
 **Source:** Orwell 1946 Rule 3; Strunk & White §II.14.
-**Directive:** Write "Y did X", not "X was done by Y", when the agent is known. Passive is correct when the agent is genuinely unknown or irrelevant — use it deliberately, not by default.
+**Directive:** Write "Y did X", not "X was done by Y", when the agent is known. Passive is correct when the agent is genuinely unknown or irrelevant; use it deliberately, not by default.
 
 - BAD: `Errors are logged to /var/log/app.log when the service restarts.`
   GOOD: `The service logs errors to /var/log/app.log on restart.`
 - BAD (postmortem): `The incident was caused by a misconfigured load balancer rule.`
   GOOD (postmortem): ``A misconfigured load balancer rule (typo in the ingress-nginx path-rewrite regex) routed `/auth/*` to the wrong upstream.``
 
-Passive hides the agent and forces the reader to reconstruct who did what — costly in postmortems and bug reports specifically, where the actor is the diagnosis.
+Passive hides the agent and forces the reader to reconstruct who did what: costly in postmortems and bug reports specifically, where the actor is the diagnosis.
 
 ### RULE-03: Prefer Concrete Language over Abstraction (high)
 
 **Source:** Strunk & White §II.16; Pinker 2014 Ch. 3.
-**Directive:** Replace category words ("factors", "aspects", "considerations", "issues") with the specific items behind them. If naming the specifics takes more than one clause, the sentence was hiding the work — do it anyway.
+**Directive:** Replace category words ("factors", "aspects", "considerations", "issues") with the specific items behind them. If naming the specifics takes more than one clause, the sentence was hiding the work; do it anyway.
 
 - BAD: `The checkout endpoint has performance issues.`
   GOOD: `The checkout endpoint's p95 latency rose from 120ms to 450ms at 14:00 UTC.`
@@ -88,7 +88,7 @@ A technical reader scans for unwarranted "fixes" or "best" and discounts the res
 ### RULE-12: Break Long Sentences; Vary Length (high)
 
 **Source:** Strunk & White §II.18; Pinker 2014 Ch. 4.
-**Directive:** Split any sentence over 30 words. Vary sentence length across a paragraph — a run of same-length sentences reads as monotone even when each one is fine on its own.
+**Directive:** Split any sentence over 30 words. Vary sentence length across a paragraph: a run of same-length sentences reads as monotone even when each one is fine on its own.
 
 - BAD (design doc, 38 words): `The ingestion pipeline processes incoming records in batches of one thousand items, stores them in the primary document store, and maintains an index on the timestamp field that supports the range queries the dashboard relies on for reporting.`
   GOOD (design doc, three sentences): `The ingestion pipeline processes incoming records in batches of a thousand. It writes them to the primary document store, which keeps a timestamp index. The dashboard's range queries rely on that index.`
@@ -98,7 +98,7 @@ Long sentences with nested clauses tax the reader's parsing budget past the poin
 ### RULE-06: Avoid Avoidable Jargon (medium)
 
 **Source:** Orwell 1946 Rule 5; Pinker 2014 Ch. 2.
-**Directive:** "leverage" → "use"; "utilize" → "use"; "methodology" → "method"; "functionality" → "function"/"feature"; "operationalize" → "start"/"build". Keep jargon that carries distinct technical meaning ("idempotency key", "connection pooling") — the rule targets substitutable corporate-speak, not necessary terms of art.
+**Directive:** "leverage" → "use"; "utilize" → "use"; "methodology" → "method"; "functionality" → "function"/"feature"; "operationalize" → "start"/"build". Keep jargon that carries distinct technical meaning ("idempotency key", "connection pooling"); the rule targets substitutable corporate-speak, not necessary terms of art.
 
 - BAD: `We leverage a retry queue to facilitate delivery of failed webhooks.`
   GOOD: `We use a retry queue to redeliver failed webhooks.`
@@ -110,7 +110,7 @@ An experienced reader mentally substitutes the shorter word anyway, so the longe
 ### RULE-07: State Claims in Positive Form (medium)
 
 **Source:** Strunk & White §II.15.
-**Directive:** "not important" → "trivial"; "did not remember" → "forgot"; prefer one affirmative word over two negating ones. At the clause level, don't stage a claim as "X, not Y" / "not just X, but Y" for cadence — state the claim directly, and keep a contrast only when the rejected alternative is specific and informs the reader ("the bottleneck is disk I/O, not CPU").
+**Directive:** "not important" → "trivial"; "did not remember" → "forgot"; prefer one affirmative word over two negating ones. At the clause level, don't stage a claim as "X, not Y" / "not just X, but Y" for cadence: state the claim directly, and keep a contrast only when the rejected alternative is specific and informs the reader ("the bottleneck is disk I/O, not CPU").
 
 - BAD: `Startup time is not as slow as in the previous release.`
   GOOD: `Startup time drops from 4.2s to 1.8s by deferring the plugin scan to first interactive action.`
@@ -122,7 +122,7 @@ Double negation costs the reader a hold-then-invert step; antithesis for cadence
 ### RULE-09: Express Coordinate Ideas in Similar Form (medium)
 
 **Source:** Strunk & White §II.19.
-**Directive:** In a list or a set of items joined by "and"/"or", give every item the same grammatical form — all noun phrases, or all verb-initial clauses, not a mix.
+**Directive:** In a list or a set of items joined by "and"/"or", give every item the same grammatical form: all noun phrases, or all verb-initial clauses, not a mix.
 
 - BAD: `The pipeline cleans the data, feature extraction, and then trains the model.`
   GOOD: `The pipeline cleans the data, extracts features, and trains the model.`
@@ -134,7 +134,7 @@ A reader forms an expected shape from item 1; a mismatched item 2 forces a backt
 ### RULE-10: Keep Related Words Together (medium)
 
 **Source:** Strunk & White §II.20; Gopen & Swan 1990.
-**Directive:** Keep subject close to verb, verb close to object. When a long parenthetical would separate them, move it to the end of the sentence or split into two sentences. Rough test: more than 8 words between subject and verb — split.
+**Directive:** Keep subject close to verb, verb close to object. When a long parenthetical would separate them, move it to the end of the sentence or split into two sentences. Rough test: more than 8 words between subject and verb, then split.
 
 - BAD (postmortem): `The database replica, which had been failing its health checks intermittently for three days before the outage but was never promoted to primary because of a misconfigured priority setting, was the direct cause of the outage.`
   GOOD (postmortem): `The database replica was the direct cause of the outage. It had been failing health checks intermittently for three days; a misconfigured priority setting prevented promotion to primary during that period.`
@@ -153,22 +153,28 @@ Gopen & Swan show readers expect new information at the sentence's end; front-lo
 
 ## Field-Observed Rules
 
-The next 13 rules (RULE-A–M) come from observing LLM output across writing projects and code releases, 2022–2026 — not drawn from a cited authority, but treated as binding alongside the 12 canonical rules above. They are organized in descending order of priority (critical → high → medium → low).
+The next 15 rules (RULE-A–O) come from observing LLM output across writing projects and code releases, 2022–2026, not drawn from a cited authority but treated as binding alongside the 12 canonical rules above. They are lettered in the order they were added; read the severity marked on each rule rather than its position.
 
 ### RULE-A: Support Claims with Citation or Concrete Evidence (critical)
 
-**Directive:** When a sentence asserts a factual claim that warrants attribution (a vendor's behavior, an RFC requirement, a measured result), name the specific source or give the concrete evidence (a number, a log line, an observed test run) — never a handwavy "it's generally known that" or "this should be faster". Never invent a source: verify it exists (the vendor's own docs, the RFC text, your own test output) before citing it, or mark `[UNVERIFIED]`.
+**Directive:** When a sentence asserts a factual claim that warrants attribution (a vendor's behavior, an RFC requirement, a measured result), name the specific source or give the concrete evidence (a number, a log line, an observed test run), never a handwavy "it's generally known that" or "this should be faster". Never invent a source: verify it exists (the vendor's own docs, the RFC text, your own test output) before citing it, or mark `[UNVERIFIED]`.
 
 - BAD (design doc): `Most providers rate-limit aggressively, so we should cache aggressively too.`
   GOOD (design doc): `Stripe's rate limit is 100 req/s per account (per their API docs); we cache idempotent GETs for 60s to stay well under it.`
 - BAD (commit message): `Fix based on user feedback.`
   GOOD (commit message): `Fix null-pointer crash reported in issue #1847 (reproducible with an empty cart).`
 
-An uncited claim is unverifiable; a fabricated source is worse, since it destroys reader trust permanently once caught. Related: RULE-03 fights vague nouns and RULE-08 fights uncalibrated verbs — a single sloppy sentence often trips all three.
+An uncited claim is unverifiable; a fabricated source is worse, since it destroys reader trust permanently once caught. Related: RULE-03 fights vague nouns and RULE-08 fights uncalibrated verbs; a single sloppy sentence often trips all three. This rule says a claim must carry its evidence; RULE-N says where that evidence lives. A length limit is never a licence to delete the evidence instead of moving it.
 
 ### RULE-B: State the Rule, Not Its History (critical)
 
 **Directive:** Never narrate past bugs, what the code used to do, or ticket numbers in code comments or documentation. State what the system does and requires now. History belongs in commit messages, PR descriptions, and issue trackers.
+
+Two exemptions, both traceability anchors rather than narration:
+
+- A test docstring or test comment may cite the ticket the test pins, because the ticket is what a later reader needs to know the test exists to protect. Production code comments may not.
+- Commit and PR titles may carry a ticket key when the repository's convention uses one (`fix(submission): BOOK-613 ...`). Check the repository's own log before adding or removing one.
+- A document describing queryable historical data (a log-query guide, a BigQuery schema note, a data-migration reference) may date a cutover and name the ticket or deploy behind it, because the reader is choosing a time range over rows written on both sides of it. Write it as a property of the rows (`rows before 2026-08 carry only six event types`), never as a story about the code change.
 
 - BAD (code comment): `BOOK-638: previously matched only exact strings, so unnormalized references fell through to None. Normalizes candidates before matching.`
   GOOD (code comment): `Normalizes candidate references before matching.`
@@ -206,11 +212,11 @@ Defensive explanations read like PR review arguments, adding noise and clutterin
 - BAD (design doc): a 4-bullet list where each bullet is a clause of one causal sentence ("Two-tower retrieval" / "Because the query embedding caches" / "And the document index updates nightly" / "Without re-running inference").
   GOOD (design doc): `We chose two-tower retrieval because the query embedding caches across sessions and the document index updates nightly without re-running inference.`
 
-Bullets read as "organized," so models reach for them by default — but each bullet strips the connective tissue (because, therefore) the argument needs.
+Bullets read as "organized," so models reach for them by default, but each bullet strips the connective tissue (because, therefore) the argument needs.
 
 ### RULE-F: Don't Use Em/En Dashes as Casual Punctuation (medium)
 
-**Directive:** Use a comma for an appositive, a semicolon for linked independent clauses, a colon for an expansion, parentheses for an aside — not an em or en dash. Numeric ranges (`2020-2026`) and paired names are unaffected; those are hyphens, not this rule's target.
+**Directive:** Use a comma for an appositive, a semicolon for linked independent clauses, a colon for an expansion, parentheses for an aside, not an em or en dash. Exempt: numeric ranges, paired names, an attribution (`— Orwell, 1946`), and a dash separating a label from its name in a list or heading (`**RULE-01 — curse of knowledge**`). Those are not sentence punctuation. Numeric ranges (`2020-2026`) and paired names are unaffected; those are hyphens, not this rule's target.
 
 - BAD: `The deploy rolled back automatically — because the health check failed — within 90 seconds.`
   GOOD: `The deploy rolled back automatically because the health check failed, within 90 seconds.`
@@ -219,16 +225,16 @@ LLMs produce dashes at several times a skilled human writer's rate, and readers 
 
 ### RULE-G: Don't Start Consecutive Sentences with the Same Word (medium)
 
-**Directive:** Vary the opener across consecutive sentences — pronoun subjects ("It", "We", "The") are the most common offenders once a fluent opener gets reused.
+**Directive:** Vary the opener across consecutive sentences: pronoun subjects ("It", "We", "The") are the most common offenders once a fluent opener gets reused.
 
 - BAD (postmortem): `It started at 14:00 UTC. It lasted 37 minutes. It affected 12% of users.`
   GOOD (postmortem): `The incident started at 14:00 UTC, lasted 37 minutes, and affected 12% of users.`
 
-Once an opener works, next-token sampling keeps reusing it — the paragraph reads as template-filled even when each sentence is individually correct.
+Once an opener works, next-token sampling keeps reusing it: the paragraph reads as template-filled even when each sentence is individually correct.
 
 ### RULE-H: Don't Overuse Transition Words (medium)
 
-**Directive:** Don't open a sentence with "Additionally"/"Furthermore"/"Moreover"/"In addition"/"Notably" unless the logical move (contrast, concession) genuinely needs flagging — usually the content alone makes the connection.
+**Directive:** Don't open a sentence with "Additionally"/"Furthermore"/"Moreover"/"In addition"/"Notably" unless the logical move (contrast, concession) genuinely needs flagging; usually the content alone makes the connection.
 
 - BAD (release note): `This release adds OAuth support. Additionally, it fixes the CSV export crash. Furthermore, it improves startup time.`
   GOOD (release note): `OAuth support lands in this release. The CSV export crash is fixed. Startup time drops from 4.2s to 1.8s.`
@@ -255,7 +261,7 @@ Varied terminology masks whether a new term is the same entity or a new one, for
 
 ### RULE-K: Don't Use Self-Certifying Language (medium)
 
-**Directive:** Cut "honestly", "frankly", "candidly", "to be clear", "truthfully". State the thing plainly instead of announcing that you're about to be honest about it. Still state limitations and corrections — just without the announcement.
+**Directive:** Cut "honestly", "frankly", "candidly", "to be clear", "truthfully". State the thing plainly instead of announcing that you're about to be honest about it. Still state limitations and corrections, just without the announcement.
 
 - BAD (PR description): `Honestly, this migration was trickier than expected and touches more files than I'd like.`
   GOOD (PR description): `This migration touches 14 files, more than planned, because the schema change cascades through three downstream views.`
@@ -266,7 +272,7 @@ The qualifier implies every other sentence might not be honest, and adds nothing
 
 ### RULE-L: Title-Case Section Headings (low)
 
-**Directive:** Capitalize first word, last word, and all major words in headings; lowercase articles, coordinating conjunctions, and short prepositions. Applies to Markdown/RST headings unless the repo's own convention is sentence-case — check existing docs before applying.
+**Directive:** Capitalize first word, last word, and all major words in headings; lowercase articles, coordinating conjunctions, and short prepositions. Applies to Markdown/RST headings unless the repo's own convention is sentence-case; check existing docs before applying.
 
 - BAD (README): `## Getting started with the API`
   GOOD (README): `## Getting Started with the API`
@@ -275,9 +281,30 @@ LLMs default to sentence-case headings from docs-site training data; in a title-
 
 ### RULE-M: Prefer Full Forms over Contractions in Formal Prose (low)
 
-**Directive:** In formal technical prose (specs, API docs, formal design docs), write "it is" not "it's", "cannot" not "can't". Contractions are fine in informal registers (release notes, commit messages) — pick a register and hold it within one document.
+**Directive:** In formal technical prose (specs, API docs, formal design docs), write "it is" not "it's", "cannot" not "can't". Contractions are fine in informal registers (release notes, commit messages); pick a register and hold it within one document.
 
 - BAD (API spec): `If the request body can't be parsed, the endpoint won't return a 200 response.`
   GOOD (API spec): `If the request body cannot be parsed, the endpoint does not return a 200 response.`
 
 A contraction inside otherwise-formal prose reads as a register break, even though the meaning parses fine either way.
+
+### RULE-N: Put Evidence at the Right Altitude (high)
+
+**Directive:** Evidence belongs where a reader can maintain it, not wherever the claim happens to sit. A code comment states the rule and keeps at most the one number that makes the rule checkable, plus a pointer to the document holding the rest. The full measurement (sample size, per-variant rates, the query that produced them, its date) lives in the repository's docs. When a comment exceeds its length limit, move the evidence out; never delete the number that justifies a constant.
+
+- BAD (code comment): a 24-line block holding a full measurement study (per-length match rates, join counts, five example identifiers) above a single `if` statement.
+  GOOD (code comment): ``A short all-digit CarrierID is a source-system row number, not a registry key: it matches a Stedi alias by coincidence. Dropping these removes 162 joins, 160 of them wrong. Rates per id length: `docs/payer-identity-and-matching.md` §4.``
+- BAD (docs): `Short numeric ids match badly, so we filter them.`
+  GOOD (docs): `As of 2026-08-11, a 5-character id shares a brand token with Stedi's DisplayName 60.9% of the time, a 4-character id 1.4%, a 3-character id 0% (query in §4.2).`
+
+RULE-A demands that a claim carry its evidence and every length limit demands brevity. The resolution is placement, not deletion: a constant whose justification was deleted to satisfy a word count reads as arbitrary, and the next reader removes it.
+
+### RULE-O: No Banner Art or Shouty Emphasis (medium)
+
+**Directive:** Do not draw box banners (`═══`, `***`, ASCII rules) around a comment or a document section, and do not use ALL CAPS for emphasis (`WHY:`, `THREE DISTINCT`, `NOTE THAT`). Use a heading, a bold label, or plain sentence order instead. Capitals are correct for identifiers that are genuinely uppercase (`QUEUED`, `NULL`, `TODO`).
+
+- BAD (code comment): a `═`-ruled banner reading `CONCURRENCY CONTRACT`, followed by `THIS IS THE CANONICAL COPY` and three `WHY:` labels.
+  GOOD (code comment): `Concurrency contract for the EHR fan-out. Canonical copy; the README and GEMINI.md summaries point here.`
+
+Banners and capitals assert importance without adding information, and they grow: once a block carries a banner, every later addition lands inside it rather than beside it, which is how a comment reaches 160 lines.
+

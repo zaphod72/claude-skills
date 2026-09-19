@@ -27,7 +27,7 @@ and real numbers, not adjectives.
 
 ---
 
-## Phase 1 — Inventory
+## Phase 1: Inventory
 
 For each tool establish: installed? indexed? how stale? how do I invoke it?
 
@@ -40,17 +40,17 @@ Two things that are easy to miss:
 
 **MCP tools may not be loaded.** gitnexus is often registered in `~/.claude.json` yet absent from
 the session tool list, because MCP servers handshake at session start. A newly installed server
-needs a client restart. `node .gitnexus/run.cjs <cmd>` serves the identical index — confirm parity,
+needs a client restart. `node .gitnexus/run.cjs <cmd>` serves the identical index: confirm parity,
 don't assume it, and prefer the CLI in written guidance since it always works.
 
 **Check for hooks.** Look in `~/.claude/settings.json` and `.claude/settings*.json`. gitnexus
 commonly installs a `PreToolUse` hook on `Grep|Glob|Bash` that auto-injects graph context into
-every search. If present, index staleness silently contaminates all your work — that belongs in
+every search. If present, index staleness silently contaminates all your work: that belongs in
 CLAUDE.md.
 
 ---
 
-## Phase 2 — Choose test symbols deliberately
+## Phase 2: Choose test symbols deliberately
 
 Not at random. You need at least these four, and ground truth from grep **before** consulting any
 graph:
@@ -63,7 +63,7 @@ graph:
 3. A **third-party** symbol imported from a dependency.
 4. A symbol **added recently**: `git diff <trunk>...HEAD -- '*.py' | grep '^+.*def '`
 
-Ground truth — mind the quoting, zsh eats a bare glob:
+Ground truth (mind the quoting, zsh eats a bare glob):
 
 ```bash
 grep -rn "<symbol>" --include='*.py' <source dirs>
@@ -71,7 +71,7 @@ grep -rn "<symbol>" --include='*.py' <source dirs>
 
 ---
 
-## Phase 3 — Head-to-head
+## Phase 3: Head-to-head
 
 Per symbol, record verbatim output:
 
@@ -84,10 +84,10 @@ graphify affected "<sym>" --depth 2
 
 Plus LSP `findReferences` and `incomingCalls` at the definition site.
 
-understand-anything has **no query CLI** — read `.ua/knowledge-graph.json` and
+understand-anything has **no query CLI**: read `.ua/knowledge-graph.json` and
 `.ua/domain-graph.json` with `python3 -c` or `jq`.
 
-Score against grep. **Report false negatives separately from false positives** — they have opposite
+Score against grep. **Report false negatives separately from false positives**: they have opposite
 consequences. Over-reporting wastes time; under-reporting says an edit is safe when it isn't. Only
 the second one causes incidents.
 
@@ -105,36 +105,36 @@ print(len(n),'orphans of',len(g['nodes'])); \
 
 Adapt the path key per tool (`source_file`, `filePath`, …). A few orphans in a just-deleted file is
 normal; a cluster in a directory that has been empty for weeks means the refresh path is additive
-and never prunes. Report the percentage — it bounds how much of *any* answer from that graph can be
+and never prunes. Report the percentage: it bounds how much of *any* answer from that graph can be
 trusted.
 
 ---
 
-## Phase 4 — Traps
+## Phase 4: Traps
 
 Each of these produced a plausible-but-wrong conclusion before being checked. Work through all
 eight.
 
 1. **Staleness confound.** Before calling a miss a resolver bug, prove the call site existed at the
    indexed commit: `git show <indexed-sha>:<path> | grep -n <symbol>`. Otherwise re-index and
-   re-run. "Stale index" and "structural blind spot" have opposite remedies — refresh more often
+   re-run. "Stale index" and "structural blind spot" have opposite remedies: refresh more often
    vs. never trust this answer.
 
 2. **graphify has two kinds of edge.** `[EXTRACTED]` = AST. `[INFERRED]` = LLM semantic pass. If
    graphify wins on recall, check whether the winning edges are `[INFERRED]`. If so that advantage
-   applies **only to code older than the last semantic pass** — date it via
+   applies **only to code older than the last semantic pass**; date it via
    `graphify-out/.graphify_semantic_marker` and the labels file mtime. `graphify update .` is
    AST-only and does **not** regenerate inferred edges. Confirm by running `graphify explain` on
    the recently-added symbol from Phase 2; if it returns no caller edges, the advantage does not
    extend to new code and CLAUDE.md must say so explicitly.
 
-3. **A full `/graphify .` rebuild can be lossy — and `update` has the opposite flaw.** Current
+3. **A full `/graphify .` rebuild can be lossy, and `update` has the opposite flaw.** Current
    graphify sends only docs/papers/images to semantic extraction; code is AST-only by design. So
    if the graph holds code→code `[INFERRED]` edges from an older version, a rebuild cannot
    recreate them, only drop them. A shrink guard refuses to write a smaller graph; **do not
    `--force` past it.** Back up `graphify-out/graph.json` first and diff after.
 
-   Prefer `graphify update .` — but know its two gaps:
+   Prefer `graphify update .`, but know its two gaps:
    - **It is additive; it does not prune deleted files.** Audit with:
      ```bash
      python3 -c "import json,os; g=json.load(open('graphify-out/graph.json')); \
@@ -148,16 +148,16 @@ eight.
    refactor that deletes files; a full rebuild only when you suspect the inferred layer has gone
    **false** (points at moved/renamed code), because a wrong edge is worse than a missing one.
 
-   Before concluding the inferred layer isn't worth preserving, **measure its precision** — sample
+   Before concluding the inferred layer isn't worth preserving, **measure its precision**: sample
    ~15 `[INFERRED]` edges and verify with grep, reporting source→source separately from
    `test_* → target`. In one repo source→source scored 4/4 and captured attribute assignment
    (`get_settings.cache_clear = _custom_clear`) and framework callback registration
-   (`FastAPI(..., lifespan=lifespan)`) — indirection an AST call-graph cannot see by construction —
+   (`FastAPI(..., lifespan=lifespan)`), indirection an AST call-graph cannot see by construction,
    while ~73% of the sample was test noise. Both halves of that finding matter.
 
 4. **The gitnexus CLAUDE.md block is machine-generated.** It sits between
    `<!-- gitnexus:start -->` / `<!-- gitnexus:end -->` and is regenerated by **both** `setup` *and*
-   a plain `analyze` — a bare `analyze` has been observed silently rewriting it. Put your findings
+   a plain `analyze`; a bare `analyze` has been observed silently rewriting it. Put your findings
    in a section **outside** the markers. If you also correct the inside, switch all future
    refreshes to `node .gitnexus/run.cjs analyze --skip-agents-md` and note that in the file.
 
@@ -174,12 +174,12 @@ eight.
 
 8. **Prove the LSP server is alive before blaming it.** If `findReferences` returns only the
    definition, run `hover` at the same position. Working hover + empty references means a healthy
-   server with no cross-package index — common in `uv`/workspace monorepos, and a fact that
+   server with no cross-package index (common in `uv`/workspace monorepos), a fact that
    overrides any global instruction preferring LSP over grep for reference-finding.
 
 ---
 
-## Phase 5 — Write CLAUDE.md
+## Phase 5: Write CLAUDE.md
 
 One consolidated section, routed by **task type**, not a tool ranking:
 
@@ -201,11 +201,11 @@ scope the override to the project file rather than editing the global one.
 ## Operating rules
 
 - Back up any artifact before an operation that could overwrite it; diff afterward.
-- Refreshing indexes is fine when free/AST-only and the dirs are gitignored — check
+- Refreshing indexes is fine when free/AST-only and the dirs are gitignored; check
   `git check-ignore -v` first. Ask before anything costing an LLM pass.
-- Report negative results honestly. The tool that scored badly is usually the most valuable
+- Report negative results plainly and accurately. The tool that scored badly is usually the most valuable
   finding.
-- If a tool is genuinely redundant, say so. If none are, say that — then name the worthless
+- If a tool is genuinely redundant, say so. If none are, say that, then name the worthless
   *capabilities* inside each, which is where the real answer usually lives.
 
 ## Self-improvement protocol

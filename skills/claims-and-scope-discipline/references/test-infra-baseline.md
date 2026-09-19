@@ -1,6 +1,6 @@
 # Baselining shared test infrastructure
 
-The full case for `SKILL.md` §11 — the evidence that the JUnit-diff gate catches what review does
+The full case for `SKILL.md` §11: the evidence that the JUnit-diff gate catches what review does
 not, and the four rules that decide what to do with a drift once it shows.
 
 The highest-risk change in a 12-aspect run was two stories rewriting one `conftest.py` that tests
@@ -25,7 +25,7 @@ reported as such, not a workaround to apply.
 
 ## Read the diff in both directions
 
-A one-line fixture change — `expire_on_commit=False`, to match production — looked strictly like an
+A one-line fixture change (`expire_on_commit=False`, to match production) looked strictly like an
 improvement until the gate showed it broke three tests in two already-merged aspects. The dangerous
 half was not the new failures: making ORM attributes *stop* expiring at commit means a test that
 **starts passing** while asserting a stale value is the one lying to you.
@@ -45,6 +45,6 @@ directory that needs it and file the general question as a ticket.
 
 ## Free by-product
 
-The baseline surfaces pre-existing failures already live on the integration branch — here two, one
+The baseline surfaces pre-existing failures already live on the integration branch: here two, one
 of them the repo's own doc-link checker. Ticket those separately so they cannot be mistaken for the
 change's fault, and note the keys in the aspect PR.

@@ -1,6 +1,6 @@
 ---
 name: One Sentence Only
-description: Every response is exactly one sentence, with no extra context
+description: "Every response is exactly one sentence, with no extra context"
 keep-coding-instructions: true
 ---
 

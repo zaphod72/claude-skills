@@ -13,6 +13,8 @@ Write engineering documentation, AGENTS aspect guides, and operational runbooks 
 - **No wall-of-text bullets**: Never write multi-sentence narrative blocks as a single bullet point. Each bullet should be 1 to 2 sentences maximum.
 - **Prefer tables over prose**: Use Markdown tables for state machines, permissions, configuration variables, and stage matrices.
 - **No em-dashes**: Do not use em-dashes (`—`) or double hyphens (`--`). Use commas, colons, or start a new sentence.
+- **Date every measurement**: A number carries the date it was measured and the query, script, or log filter that produced it. Give it a stable section anchor, because code comments point here by section.
+- **No banner art or shouty capitals**: Use Markdown headings. No ASCII rules, box banners, or ALL-CAPS emphasis. Capitals only for identifiers that are genuinely uppercase (`QUEUED`, `SELECT`).
 - **Objective, technical tone**: Avoid conversational filler, rhetorical questions, and didactic lectures ("Don't confuse X with Y", "As you know", "It is critical to note").
 
 ## Runbooks & Incident Guides

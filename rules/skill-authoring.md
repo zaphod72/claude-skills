@@ -15,8 +15,8 @@ on who called the skill, so it does not reproduce consistently.
 
 Observed 2026-09-04 in `skills/improve-memory/SKILL.md` (BOOK-851). A retention-prune line
 committed as `awk -v keep="$KEEP" '{a[NR]=$0} ...'` was delivered as
-`awk -v keep="$KEEP" '{a[NR]=Learnings} ...'` — `Learnings` being the first word of that
-invocation's `args`. `$KEEP` on the same line survived, so the rewrite targets positional patterns
+`awk -v keep="$KEEP" '{a[NR]=Learnings} ...'` (`Learnings` being the first word of that
+invocation's `args`). `$KEEP` on the same line survived, so the rewrite targets positional patterns
 specifically, not shell variables generally.
 
 The failure is silent at every layer. The corrupted line above is valid `awk` that does nothing:
@@ -27,7 +27,7 @@ becomes a no-op. Retention pruning simply stopped happening, with no error anywh
 
 - **Check before committing a skill:** `grep -n '\$[0-9]' skills/*/SKILL.md` must return nothing.
 - **Rewrite around the pattern rather than escaping it.** Reach for a form that needs no positional
-  reference at all — `sort -r | tail -n +N` in place of an `awk` line-buffer, or a
+  reference at all: `sort -r | tail -n +N` in place of an `awk` line-buffer, or a
   `while IFS= read -r` loop.
 - **Prefer invoking skills with no `args`.** Pass inputs as exported environment variables instead;
   a skill invoked with no argument string has nothing to substitute. This is also why a skill that
@@ -55,14 +55,14 @@ comes up:
 ```
 
 **Split by circumstance, never by length or by topic tidiness.** The reader is an agent deciding
-what to load before it knows what it will find, so the pointer has to name the moment — *read
-before changing shared test infrastructure*, not *more on testing*. Splitting by subject scatters
+what to load before it knows what it will find, so the pointer has to name the moment (*read
+before changing shared test infrastructure*, not *more on testing*). Splitting by subject scatters
 material one invocation needs across two files and buys nothing.
 
 **What stays behind is the rule itself**, in a sentence or two, never a bare "see elsewhere". A
 reader who never opens the reference file still gets the rule; the file holds the instances, the
 commands, and the worked evidence behind it. Open each reference file by naming the section it
-backs — `The full case for SKILL.md §9 — …` — so a file opened on its own says what it belongs to.
+backs (e.g. `The full case for SKILL.md §9: …`) so a file opened on its own says what it belongs to.
 
 `skill-check`'s `body.max_lines` is set to `warn` in `skill-check.config.json`, so length is a
 smell it reports rather than a gate. A long `SKILL.md` every invocation reads end to end is fine;
